@@ -41,7 +41,6 @@ import { isInApplicationFolder } from '../../ui/main-process-proxy'
 import { getRendererGUID } from '../get-renderer-guid'
 import { ValidNotificationPullRequestReviewState } from '../valid-notification-pull-request-review'
 import { useExternalCredentialHelperKey } from '../trampoline/use-external-credential-helper'
-import { getUserAgent } from '../http'
 import { getHooksEnvEnabled } from '../hooks/config'
 import { parseModelKey } from '../copilot/byok'
 import { DefaultCopilotModel } from '../stores/copilot-store'
@@ -58,8 +57,6 @@ type PullRequestReviewStatFieldSuffix =
 
 type PullRequestReviewStatField =
   `pullRequestReview${PullRequestReviewStatFieldInfix}${PullRequestReviewStatFieldSuffix}`
-
-const StatsEndpoint = 'https://central.github.com/api/usage/desktop'
 
 /** The URL to the stats samples page. */
 export const SamplesURL = 'https://desktop.github.com/usage-data/'
@@ -469,15 +466,29 @@ export interface IStatsStore {
   increment: (k: keyof NumericMeasures, n?: number) => Promise<void>
 }
 
-const defaultPostImplementation = (body: Record<string, any>) =>
-  fetch(StatsEndpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'user-agent': getUserAgent(),
-    },
-    body: JSON.stringify(body),
-  })
+/**
+ * Telemetry is disabled in this fork.
+ *
+ * `StatsEndpoint` is GitHub's own collection endpoint. It would happily accept
+ * our traffic, which is exactly the problem: a fork sending its users' usage
+ * data to a third party nobody agreed to share it with. There is no
+ * replacement endpoint because we do not collect any.
+ *
+ * The surrounding machinery (opt-out preference, local counters, the daily
+ * timer) is left intact rather than ripped out -- it is upstream code we would
+ * otherwise have to keep re-merging, and with no transmission it is inert.
+ */
+const defaultPostImplementation = async (
+  body: Record<string, any>
+): Promise<Response> => {
+  log.debug(
+    `[StatsStore] telemetry disabled in this fork; discarding report with ${
+      Object.keys(body).length
+    } fields`
+  )
+
+  return new Response(null, { status: 204, statusText: 'No Content' })
+}
 
 /** The store for the app's stats. */
 export class StatsStore implements IStatsStore {

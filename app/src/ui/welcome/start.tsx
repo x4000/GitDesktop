@@ -7,7 +7,6 @@ import * as octicons from '../octicons/octicons.generated'
 import { Button } from '../lib/button'
 import { Loading } from '../lib/loading'
 import { BrowserRedirectMessage } from '../lib/authentication-form'
-import { SamplesURL } from '../../lib/stats'
 
 /**
  * The URL to the sign-up page on GitHub.com. Used in conjunction
@@ -28,18 +27,18 @@ export class Start extends React.Component<IStartProps, {}> {
     return (
       <section
         id="start"
-        aria-label="Welcome to GitHub Desktop"
+        aria-label={`Welcome to ${__APP_NAME__}`}
         aria-describedby="start-description"
       >
         <div className="start-content">
           <h1 className="welcome-title">
-            Welcome to <span>GitHub Desktop</span>
+            Welcome to <span>{__APP_NAME__}</span>
           </h1>
           {!this.props.loadingBrowserAuth ? (
             <>
               <p id="start-description" className="welcome-text">
-                GitHub Desktop is a seamless way to contribute to projects on
-                GitHub and GitHub Enterprise. Sign in below to get started with
+                {__APP_NAME__} is a way to contribute to projects on GitHub,
+                GitHub Enterprise, and Gitea. Sign in below to get started with
                 your existing projects.
               </p>
             </>
@@ -64,7 +63,7 @@ export class Start extends React.Component<IStartProps, {}> {
               <Button onClick={this.cancelBrowserAuth}>Cancel</Button>
             ) : (
               <Button onClick={this.signInToEnterprise}>
-                Sign in to GitHub Enterprise
+                Sign in to GitHub Enterprise or Gitea
               </Button>
             )}
           </div>
@@ -84,22 +83,21 @@ export class Start extends React.Component<IStartProps, {}> {
           </div>
         </div>
 
+        {/*
+          Upstream also states here that the app sends usage metrics. This fork
+          disables telemetry entirely (see stats-store.ts), so repeating that
+          claim would be false. The terms below are retained because the
+          "Create your free account" link above does go to GitHub.
+        */}
         <div className="start-footer">
           <p>
-            By creating an account, you agree to the{' '}
+            By creating a GitHub account, you agree to GitHub's{' '}
             <LinkButton uri={'https://github.com/site/terms'}>
               Terms of Service
             </LinkButton>
             . For more information about GitHub's privacy practices, see the{' '}
             <LinkButton uri={'https://github.com/site/privacy'}>
               GitHub Privacy Statement.
-            </LinkButton>
-          </p>
-          <p>
-            GitHub Desktop sends usage metrics to improve the product and inform
-            feature decisions.{' '}
-            <LinkButton uri={SamplesURL}>
-              Learn more about user metrics.
             </LinkButton>
           </p>
         </div>

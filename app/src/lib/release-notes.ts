@@ -92,13 +92,12 @@ export function getReleaseSummary(
 export async function getChangeLog(
   limit?: number
 ): Promise<ReadonlyArray<ReleaseMetadata>> {
+  // Served straight from the repository rather than upstream's changelog
+  // service, which would show GitHub Desktop's release notes inside this app.
+  // No `env` parameter: this fork has a single release channel.
   const changelogURL = new URL(
-    'https://central.github.com/deployments/desktop/desktop/changelog.json'
+    'https://raw.githubusercontent.com/x4000/GitDesktop/main/changelog.json'
   )
-
-  if (__RELEASE_CHANNEL__ === 'beta' || __RELEASE_CHANNEL__ === 'test') {
-    changelogURL.searchParams.set('env', __RELEASE_CHANNEL__)
-  }
 
   if (limit !== undefined) {
     changelogURL.searchParams.set('limit', limit.toString())
