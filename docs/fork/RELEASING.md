@@ -36,18 +36,32 @@ erroring. Hence:
 
 ## macOS
 
-macOS builds are unsigned. Squirrel.Mac will not apply an update to an unsigned
-app, so publishing a macOS zip would offer Mac users an update that fails on
-install and re-downloads on the next check.
+**Releases are Windows-only.** macOS is not in the build matrix at all.
 
-So macOS is built — which catches build breakage and produces a downloadable
-artifact for manual installs — but its zip is withheld from the release, and the
-feed correctly reports "no update available" to Mac clients.
+Two reasons. macOS builds are unsigned, and Squirrel.Mac will not apply an
+update to an unsigned app, so publishing a macOS zip would offer Mac users an
+update that fails on install and re-downloads on the next check. And upstream's
+matrix builds macOS on `macos-14-xlarge`, a *larger* runner, which GitHub bills
+even for public repositories — the first release attempt failed there on
+billing before Windows had started.
 
-To enable macOS updates: obtain an Apple Developer account ($99/year), add the
+Building macOS only to withhold the result was paying for artifacts we discard.
+
+To enable macOS: obtain an Apple Developer account ($99/year), add the
 `APPLE_ID`, `APPLE_ID_PASSWORD`, `APPLE_TEAM_ID`, `APPLE_APPLICATION_CERT`, and
-`APPLE_APPLICATION_CERT_PASSWORD` secrets, restore them to the build step, and
-set `PUBLISH_MACOS: 'true'` in the workflow.
+`APPLE_APPLICATION_CERT_PASSWORD` secrets, restore them to the build step, add a
+`macos-14` entry to the matrix, and set `PUBLISH_MACOS: 'true'`.
+
+Use `macos-14` rather than upstream's `macos-14-xlarge` — the standard runner is
+free for public repositories. It is Apple Silicon, so an x64 build needs
+`macos-13` or cross-compilation via `npm_config_arch`.
+
+### Note on ci.yml
+
+Upstream's `ci.yml` also uses `macos-14-xlarge`. It does not run on pushes to
+`main` (it watches `development`), but it *does* run on pull requests, and will
+fail there on billing for the same reason. Left alone for now: it is an upstream
+file we would rather not carry a diff in until it actually gets in the way.
 
 ## Windows signing
 

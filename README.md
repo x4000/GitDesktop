@@ -24,10 +24,9 @@ Download the latest installer from [Releases](https://github.com/x4000/GitDeskto
 **Windows** updates automatically. Builds are unsigned, so the first run shows a
 SmartScreen warning — choose "More info" then "Run anyway".
 
-**macOS** is manual-install only. We do not sign or notarize, and macOS refuses
-to auto-update an unsigned app, so macOS builds are published as workflow
-artifacts rather than release assets. See
-[docs/fork/RELEASING.md](docs/fork/RELEASING.md).
+**macOS is not built or released.** Builds would be unsigned, and macOS refuses
+to auto-update an unsigned app. See
+[docs/fork/RELEASING.md](docs/fork/RELEASING.md) for what enabling it involves.
 
 ## Relationship to upstream
 

@@ -46,11 +46,19 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        os: [macos-14-xlarge, windows-2022]
+        # Windows only. macOS is not published (see PUBLISH_MACOS above and the
+        # header comment), so building it produced artifacts we then threw
+        # away -- and it did so on macos-14-xlarge, a *larger* runner, which is
+        # billed even for public repositories. The first release failed there
+        # on billing before Windows had started.
+        #
+        # To restore macOS once it is signed: add a `macos-14` entry (standard,
+        # free for public repos, arm64) and set PUBLISH_MACOS to 'true'. Note
+        # that macos-14 is Apple Silicon, so an x64 build needs macos-13 or
+        # cross-compilation via npm_config_arch.
+        os: [windows-2022]
         arch: [x64, arm64]
         include:
-          - os: macos-14-xlarge
-            friendlyName: macOS
           - os: windows-2022
             friendlyName: Windows
     timeout-minutes: 60
