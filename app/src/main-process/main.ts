@@ -117,8 +117,14 @@ if (__DEV_SECRETS__) {
 
 // On Windows, in order to get notifications properly working for dev builds,
 // we'll want to set the right App User Model ID from production builds.
+//
+// Squirrel derives this from the package name, which is
+// getWindowsIdentifierName() in script/dist-info.ts -- keep the two in step.
+// Left as upstream's 'GitHubDesktop', a dev build claims GitHub Desktop's
+// identity: Windows groups it under that app in the taskbar and routes its
+// notifications there.
 if (__WIN32__ && __DEV__) {
-  app.setAppUserModelId('com.squirrel.GitHubDesktop.GitHubDesktop')
+  app.setAppUserModelId(`com.squirrel.${__APP_NAME__}.${__APP_NAME__}`)
 }
 
 app.on('window-all-closed', () => {

@@ -1059,11 +1059,58 @@ export class API {
           options?.onPage?.(page)
         },
       })
+
+      // GitHub's /user/repos returns everything the user can reach, including
+      // repositories owned by their organizations. Gitea's returns only what
+      // the user personally owns, so a user whose work lives under an org sees
+      // an empty list with no error to explain it. Enumerate the orgs and
+      // fetch their repositories to get back to GitHub's semantics.
+      //
+      // Only for the unfiltered call: the affiliation-specific calls below
+      // exist to split an oversized result set, and Gitea ignores
+      // `affiliation` entirely, so doing this there would fetch the same
+      // repositories three more times.
+      if (affiliation === undefined && isGitea(this.endpoint)) {
+        await this.streamGiteaOrganizationRepositories(callback, options)
+      }
     } catch (error) {
       log.warn(
         `streamUserRepositories: failed with endpoint ${this.endpoint}`,
         error
       )
+    }
+  }
+
+  /**
+   * Stream the repositories of every organization the user belongs to.
+   *
+   * Gitea only. See the call site in `streamUserRepositories` for why.
+   */
+  private async streamGiteaOrganizationRepositories(
+    callback: (repos: ReadonlyArray<IAPIRepository>) => void,
+    options?: IFetchAllOptions<IAPIRepository>
+  ) {
+    const orgs = await this.fetchOrgs()
+
+    for (const org of orgs) {
+      try {
+        await this.fetchAll<IAPIRepository>(`orgs/${org.login}/repos`, {
+          ...options,
+          // `continue` belongs to the caller's paging strategy for the user's
+          // own repositories; reusing it here would cut an org's listing short.
+          continue: undefined,
+          onPage: page => {
+            callback(page.filter(x => x.owner !== null))
+            options?.onPage?.(page)
+          },
+        })
+      } catch (error) {
+        // One inaccessible org should not empty the whole list.
+        log.warn(
+          `streamGiteaOrganizationRepositories: failed for org ${org.login}`,
+          error
+        )
+      }
     }
   }
 
