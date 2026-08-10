@@ -42,7 +42,9 @@ const BottomImageUri = encodePathAsUrl(
   'static/welcome-illustration-left-bottom.svg'
 )
 
-const issuesUri = 'https://github.com/desktop/desktop/issues'
+// Ours, not upstream's -- a crash in this fork is not desktop/desktop's to
+// triage, and sending users there would waste their maintainers' time.
+const issuesUri = 'https://github.com/x4000/GitDesktop/issues'
 
 /**
  * Formats an error by attempting to strip out user-identifiable information
@@ -136,8 +138,8 @@ export class CrashApp extends React.Component<ICrashAppProps, ICrashAppState> {
   private renderTitle() {
     const message =
       this.state.type === 'launch'
-        ? 'GitHub Desktop failed to launch'
-        : 'GitHub Desktop encountered an error'
+        ? `${__APP_NAME__} failed to launch`
+        : `${__APP_NAME__} encountered an error`
 
     return (
       <header>
@@ -148,21 +150,22 @@ export class CrashApp extends React.Component<ICrashAppProps, ICrashAppState> {
   }
 
   private renderDescription() {
+    // Upstream adds "This has been reported to the team" here. This fork has
+    // no crash reporting, so saying so would leave users waiting on a fix
+    // nobody has been told about.
     if (this.state.type === 'launch') {
       return (
         <p>
-          GitHub Desktop encountered a catastrophic error that prevents it from
-          launching. This has been reported to the team, but if you encounter
-          this repeatedly please report this issue to the GitHub Desktop{' '}
+          {__APP_NAME__} encountered a catastrophic error that prevents it from
+          launching. Please report this issue to the {__APP_NAME__}{' '}
           <LinkButton uri={issuesUri}>issue tracker</LinkButton>.
         </p>
       )
     } else {
       return (
         <p>
-          GitHub Desktop has encountered an unrecoverable error and will need to
-          restart. This has been reported to the team, but if you encounter this
-          repeatedly please report this issue to the GitHub Desktop{' '}
+          {__APP_NAME__} has encountered an unrecoverable error and will need to
+          restart. Please report this issue to the {__APP_NAME__}{' '}
           <LinkButton uri={issuesUri}>issue tracker</LinkButton>.
         </p>
       )

@@ -7,7 +7,11 @@ export function getKeyForAccount(account: Account): string {
 
 /** Get the auth key for the endpoint. */
 export function getKeyForEndpoint(endpoint: string): string {
-  const appName = __DEV__ ? 'GitHub Desktop Dev' : 'GitHub'
+  // This is the credential-store key. Upstream uses the bare name 'GitHub',
+  // so keeping it would mean this fork and an installed GitHub Desktop share
+  // one entry per endpoint -- each overwriting the other's token. Namespacing
+  // by our own app name keeps the two independent.
+  const appName = __DEV__ ? `${__APP_NAME__} Dev` : __APP_NAME__
 
   return `${appName} - ${endpoint}`
 }

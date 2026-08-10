@@ -156,10 +156,13 @@ function removeShortcut(): Promise<void> {
 async function updateShortcut(): Promise<void> {
   const homeDirectory = Os.homedir()
   if (homeDirectory) {
+    // Squirrel names the shortcut after the app, so this must track the
+    // product name or the update would look for a shortcut that never existed
+    // and silently stop maintaining the user's desktop icon.
     const desktopShortcutPath = Path.join(
       homeDirectory,
       'Desktop',
-      'GitHub Desktop.lnk'
+      `${__APP_NAME__}.lnk`
     )
     const exists = await pathExists(desktopShortcutPath)
     const locations: ShortcutLocations = exists

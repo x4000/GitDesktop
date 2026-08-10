@@ -24,6 +24,11 @@
       color: var(--toolbar-button-secondary-color);
       margin: 0 var(--spacing);
       align-self: center;
+      // Explicit sizing: upstream rendered an octicon here, which carries its
+      // own intrinsic dimensions. Ours is a bitmap and would otherwise render
+      // at its natural 128px.
+      width: 16px;
+      height: 16px;
     }
   }
 

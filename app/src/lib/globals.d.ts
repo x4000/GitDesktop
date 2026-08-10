@@ -28,6 +28,13 @@ declare const __LINUX__: boolean
 declare const __APP_NAME__: string
 
 /**
+ * The company name from app/package.json. Squirrel groups Start Menu
+ * shortcuts under a folder of this name, so anything looking for those
+ * shortcuts has to agree with it.
+ */
+declare const __COMPANY_NAME__: string
+
+/**
  * The current version of the app, this is intended to be a compile-time
  * replacement for app.getVersion
  * (https://www.electronjs.org/docs/latest/api/app#appgetname)

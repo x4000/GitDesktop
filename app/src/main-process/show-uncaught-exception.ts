@@ -27,12 +27,13 @@ export function showUncaughtException(isLaunchError: boolean, error: Error) {
     await dialog.showMessageBox({
       type: 'error',
       title: __DARWIN__ ? `Unrecoverable Error` : 'Unrecoverable error',
+      // Upstream says the error "has been reported to the team". This fork
+      // has no crash reporting, so claiming otherwise would leave users
+      // waiting on a fix nobody has been told about.
       message:
-        `GitHub Desktop has encountered an unrecoverable error and will need to restart.\n\n` +
-        `This has been reported to the team, but if you encounter this repeatedly please report ` +
-        `this issue to the GitHub Desktop issue tracker.\n\n${
-          error.stack || error.message
-        }`,
+        `${__APP_NAME__} has encountered an unrecoverable error and will need to restart.\n\n` +
+        `If you encounter this repeatedly, please report it to the ${__APP_NAME__} ` +
+        `issue tracker.\n\n${error.stack || error.message}`,
     })
 
     if (!__DEV__) {

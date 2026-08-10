@@ -2,9 +2,8 @@ import * as React from 'react'
 import memoizeOne from 'memoize-one'
 import { WindowState } from '../../lib/window-state'
 import { WindowControls } from './window-controls'
-import { Octicon } from '../octicons/octicon'
-import * as octicons from '../octicons/octicons.generated'
 import { isMacOSBigSurOrLater, isMacOSTahoeOrLater } from '../../lib/get-os'
+import { encodePathAsUrl } from '../../lib/path'
 import {
   getAppleActionOnDoubleClick,
   isWindowMaximized,
@@ -29,6 +28,13 @@ export function getTitleBarHeight() {
 
   return 28
 }
+
+/**
+ * Our app mark, shown at the left of the Windows title bar. Generated from
+ * app/static/logos/app-icon.png by script/fork/generate-icons.py; the `common`
+ * directory is flattened into `static` at build time.
+ */
+const AppIconUrl = encodePathAsUrl(__dirname, 'static/logo-64x64@2x.png')
 
 interface ITitleBarProps {
   /**
@@ -109,8 +115,11 @@ export class TitleBar extends React.Component<ITitleBarProps> {
     const titleBarClass =
       this.props.titleBarStyle === 'light' ? 'light-title-bar' : ''
 
+    // Upstream renders the markGithub octicon here. That is GitHub's
+    // Invertocat, which we have no right to ship, so this is our own mark --
+    // an image rather than an octicon, since octicons are a fixed SVG set.
     const appIcon = this.props.showAppIcon ? (
-      <Octicon className="app-icon" symbol={octicons.markGithub} />
+      <img className="app-icon" src={AppIconUrl} alt="" />
     ) : null
 
     const onTitlebarDoubleClick = __DARWIN__

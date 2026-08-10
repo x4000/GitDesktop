@@ -7,6 +7,10 @@ import { shell } from 'electron'
  * activator CLSID needed to handle Windows notifications from the Action Center.
  */
 export function findToastActivatorClsid() {
+  // These must name OUR shortcuts. Left as upstream's, the lookup would find
+  // an installed GitHub Desktop's shortcut on the same machine and hand back
+  // its toast activator, so our notifications would be attributed to -- and
+  // routed through -- a different application entirely.
   const shortcutPaths = [
     path.join(
       os.homedir(),
@@ -16,10 +20,10 @@ export function findToastActivatorClsid() {
       'Windows',
       'Start Menu',
       'Programs',
-      'GitHub, Inc',
-      'GitHub Desktop.lnk'
+      __COMPANY_NAME__,
+      `${__APP_NAME__}.lnk`
     ),
-    path.join(os.homedir(), 'Desktop', 'GitHub Desktop.lnk'),
+    path.join(os.homedir(), 'Desktop', `${__APP_NAME__}.lnk`),
   ]
 
   for (const shortcutPath of shortcutPaths) {
