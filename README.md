@@ -11,9 +11,11 @@ Everything else tracks upstream and is merged in periodically. This is not a
 general-purpose replacement for GitHub Desktop — if you are not on our team,
 you almost certainly want [the original](https://desktop.github.com/).
 
-> **Status: infrastructure only.** The release, update, and branding pipeline is
-> in place. The sidebar and Gitea work described above has not been written
-> yet, so today this is upstream GitHub Desktop with our packaging.
+> **Status: early.** The release, update, and branding pipeline is in place, and
+> Gitea sign-in works — signing in with a personal access token, listing
+> repositories, and fetching are all verified against a real instance. The
+> sidebar rework has not been started, and GitHub sign-in still runs through
+> upstream's development OAuth application, which is not shippable.
 
 ## Installing
 

@@ -99,18 +99,32 @@ Relevant scopes are `repository` and `user` (each has read/write variants).
 
 ## Status
 
-**Not yet implemented.** The build still carries upstream's secret-based web
-flow, so sign-in does not currently work correctly in this fork.
+**Gitea token sign-in works and is verified against `git.arcengames.com`.**
+Signing in, listing repositories, and git fetch all succeed. Token entry is
+offered for every Gitea endpoint; both sign-in surfaces (the Preferences dialog
+and the Welcome flow) share one implementation in
+`app/src/ui/fork/gitea-token-form.tsx`.
 
-The work, in order:
+Remaining, in rough priority order:
 
-1. GitHub device flow, replacing the authorization-code exchange in
-   `app/src/lib/api.ts` and dropping `__OAUTH_SECRET__` from the build.
-2. Gitea PKCE against the known-instances list.
-3. Gitea PAT entry as the fallback for unregistered instances. Note that
-   upstream deleted its token/password form — `authentication-form.tsx` is now a
-   single "Sign in using your browser" button — so this means restoring UI. That
-   file has had zero commits upstream in twelve months, so it is cheap surface
-   to own.
+1. **GitHub device flow.** Replaces the authorization-code exchange in
+   `app/src/lib/api.ts` and drops `__OAUTH_SECRET__` from the build. Until this
+   lands, release builds authenticate to GitHub through *upstream's development
+   OAuth application* — fine for development, not acceptable to ship.
+2. **Gitea PKCE** for registered instances, so they get browser sign-in instead
+   of pasting a token. Token sign-in already works everywhere, so this is
+   convenience rather than capability. See the warning on
+   `usesTokenAuthentication` before changing it.
 
-Outstanding before step 2: the Arcen instance URL, which keys the client ID.
+### A trap worth knowing about
+
+Changing the key returned by `getKeyForEndpoint` orphans every stored
+credential: it stays in the credential store under the old name, and the
+account then loads with an empty token. The app looks signed in but every
+request goes out anonymous, which the API reports as an empty result or a 403
+that says nothing about credentials.
+
+There are no released installs yet, so the current rename cost only a
+re-authentication. If it ever changes again after release, write a migration
+that reads the old key and rewrites it rather than silently signing everyone
+out.
