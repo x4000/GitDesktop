@@ -1,0 +1,53 @@
+// Fork: the repository list as a permanent left-hand pane rather than a
+// toolbar foldout. See app/src/ui/fork/repository-sidebar.tsx.
+
+// Row wrapper introduced in App.renderContentArea. #desktop-app-contents is a
+// flex column (toolbar, banner, content), so this is the row that splits the
+// content band into sidebar and everything else.
+#fork-content-area {
+  display: flex;
+  flex-direction: row;
+  flex-grow: 1;
+  // Without this a tall repository list refuses to shrink and pushes the
+  // window's scroll height instead of scrolling internally.
+  min-height: 0;
+}
+
+#fork-repository-sidebar {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: var(--base-border);
+  background: var(--box-alt-background-color);
+
+  // The repository list is written for a foldout that sizes itself. In a fixed
+  // pane it has to fill the space instead.
+  .repository-list {
+    flex-grow: 1;
+    min-height: 0;
+  }
+}
+
+// The current-repository name in the toolbar. Upstream had a ToolbarDropdown
+// here; this keeps the same footprint so the toolbar's proportions do not
+// shift, but reads as static text.
+.fork-current-repository-label {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  height: 100%;
+  padding: 0 var(--spacing);
+  color: var(--toolbar-text-color);
+
+  .octicon {
+    flex-shrink: 0;
+    margin-right: var(--spacing-half);
+  }
+
+  .title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: var(--font-weight-semibold);
+  }
+}

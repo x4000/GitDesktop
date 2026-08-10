@@ -50,7 +50,6 @@ import { DeleteBranch, DeleteRemoteBranch } from './delete-branch'
 import { CloningRepositoryView } from './cloning-repository'
 import {
   Toolbar,
-  ToolbarDropdown,
   DropdownState,
   PushPullButton,
   BranchDropdown,
@@ -58,6 +57,8 @@ import {
   RevertProgress,
 } from './toolbar'
 import { iconForRepository, OcticonSymbol } from './octicons'
+import { RepositorySidebar } from './fork/repository-sidebar'
+import { CurrentRepositoryLabel } from './fork/current-repository-label'
 import * as octicons from './octicons/octicons.generated'
 import {
   showCertificateTrustDialog,
@@ -3335,9 +3336,27 @@ export class App extends React.Component<IAppProps, IAppState> {
       >
         {this.renderToolbar()}
         {this.renderBanner()}
-        {this.renderRepository()}
+        {this.renderContentArea()}
         {this.renderPopups()}
         {this.renderDragElement()}
+      </div>
+    )
+  }
+
+  /**
+   * Fork: the repository list is a permanent left-hand pane rather than a
+   * toolbar foldout. The blank-slate view has no repositories to list and
+   * renders its own full-width layout, so it is left alone.
+   */
+  private renderContentArea() {
+    if (this.inNoRepositoriesViewState()) {
+      return this.renderRepository()
+    }
+
+    return (
+      <div id="fork-content-area">
+        <RepositorySidebar>{this.renderRepositoryList()}</RepositorySidebar>
+        {this.renderRepository()}
       </div>
     )
   }
@@ -3487,42 +3506,16 @@ export class App extends React.Component<IAppProps, IAppState> {
       title = __DARWIN__ ? 'No Repositories' : 'No repositories'
     }
 
-    const isOpen =
-      this.state.currentFoldout &&
-      this.state.currentFoldout.type === FoldoutType.Repository
-
-    const currentState: DropdownState = isOpen ? 'open' : 'closed'
-
-    const tooltip = repository && !isOpen ? repository.path : undefined
-
-    const foldoutWidth = clamp(this.state.sidebarWidth)
-
-    const foldoutStyle: React.CSSProperties = {
-      position: 'absolute',
-      marginLeft: 0,
-      width: foldoutWidth,
-      minWidth: foldoutWidth,
-      height: '100%',
-      top: 0,
-    }
-
-    /** The dropdown focus trap will stop focus event propagation we made need
-     * in some of our dialogs (noticed with Lists). Disabled this when dialogs
-     * are open */
-    const enableFocusTrap = this.state.currentPopup === null
-
+    // Fork: the repository list is a permanent left-hand pane, so this shows
+    // which repository is current rather than opening a foldout to change it.
+    // Upstream's ToolbarDropdown wiring is deliberately gone; the foldout it
+    // rendered has no way to be opened any more.
     return (
-      <ToolbarDropdown
+      <CurrentRepositoryLabel
         icon={icon}
         title={title}
-        description={__DARWIN__ ? 'Current Repository' : 'Current repository'}
-        tooltip={tooltip}
-        foldoutStyle={foldoutStyle}
+        path={repository instanceof Repository ? repository.path : undefined}
         onContextMenu={this.onRepositoryToolbarButtonContextMenu}
-        onDropdownStateChanged={this.onRepositoryDropdownStateChanged}
-        dropdownContentRenderer={this.renderRepositoryList}
-        dropdownState={currentState}
-        enableFocusTrap={enableFocusTrap}
       />
     )
   }
