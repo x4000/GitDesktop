@@ -1828,7 +1828,16 @@ export class API {
     do {
       const response: Response = await this.ghRequest('GET', nextPath)
       if (opts.suppressErrors !== false && !response.ok) {
-        log.warn(`fetchAll: '${path}' returned a ${response.status}`)
+        // Include the body. A suppressed error surfaces in the UI as "no
+        // results", which is indistinguishable from genuinely having none --
+        // and the body is usually the only thing that says why. Gitea in
+        // particular names the missing token scope here.
+        const detail = await response
+          .text()
+          .then(t => t.slice(0, 500))
+          .catch(() => '<unreadable>')
+
+        log.warn(`fetchAll: '${path}' returned a ${response.status}: ${detail}`)
         return buf
       }
 
