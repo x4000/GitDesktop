@@ -17,3 +17,4 @@
 /script/fork/**                        merge=ours
 /docs/fork/**                          merge=ours
 /app/src/ui/fork/**                    merge=ours
+/README.md                             merge=ours
