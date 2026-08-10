@@ -57,7 +57,11 @@ jobs:
         # that macos-14 is Apple Silicon, so an x64 build needs macos-13 or
         # cross-compilation via npm_config_arch.
         os: [windows-2022]
-        arch: [x64, arm64]
+        # x64 only: that is what we serve. Windows on arm64 runs x64 builds
+        # under emulation, so an arm64 build is an optimisation, not a
+        # requirement. Add 'arm64' back here when it is worth the build time --
+        # the asset naming and RELEASES merge already handle both.
+        arch: [x64]
         include:
           - os: windows-2022
             friendlyName: Windows
@@ -194,9 +198,7 @@ jobs:
           }
           # win32: /.*-win32-(ia32|x64|arm64).*/
           check 'GitDesktopSetup-win32-x64.exe'
-          check 'GitDesktopSetup-win32-arm64.exe'
           check '*-win32-x64-full.nupkg'
-          check '*-win32-arm64-full.nupkg'
           check 'RELEASES'
           if [ "${PUBLISH_MACOS}" = "true" ]; then
             # darwin: /.*-(mac|darwin|osx).*\.zip$/, arm64 keyed on '-arm64'

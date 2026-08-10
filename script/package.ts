@@ -3,7 +3,11 @@
 import * as cp from 'child_process'
 import * as path from 'path'
 import * as electronInstaller from 'electron-winstaller'
-import { getProductName, getCompanyName } from '../app/package-info'
+import {
+  getProductName,
+  getCompanyName,
+  getRepositorySlug,
+} from '../app/package-info'
 import {
   getDistPath,
   getOSXZipPath,
@@ -11,7 +15,6 @@ import {
   getWindowsStandaloneName,
   getWindowsInstallerName,
   shouldMakeDelta,
-  getUpdatesURL,
   getBundleSizes,
   getDistRoot,
   getDistArchitecture,
@@ -60,7 +63,7 @@ function packageOSX() {
   )
 }
 
-function packageWindows() {
+async function packageWindows() {
   const iconSource = join(getIconDirectory(), 'icon-logo.ico')
 
   if (!existsSync(iconSource)) {
@@ -101,12 +104,38 @@ function packageWindows() {
     setupMsi: getWindowsInstallerName(),
   }
 
+  // Whether deltas are actually being produced, as opposed to merely wanted.
+  // The rename step below depends on this too: it looked for a delta package
+  // unconditionally and died with ENOENT when one was not built.
+  let makingDeltas = false
+
   if (shouldMakeDelta()) {
-    // Squirrel.Windows fetches the previous RELEASES from here to build the
-    // delta package against. Upstream appended a 'bypassStaggeredRelease'
-    // query parameter, which is a central.github.com feature and meaningless
-    // to update.electronjs.org, so it is dropped.
-    options.remoteReleases = getUpdatesURL()
+    // Squirrel needs a *previous* release to diff a delta package against.
+    //
+    // Upstream pointed this at their update endpoint, which always has one.
+    // Ours did not on the first release, and Squirrel does not treat that as
+    // "no deltas then" -- it fails the whole packaging step with a 404 buried
+    // in a .NET stack trace.
+    //
+    // So: ask GitHub whether a release exists, and only enable deltas if one
+    // does. This is self-healing -- deltas switch on by themselves from the
+    // second release onwards, with no flag to remember to flip.
+    //
+    // The value is the repository root URL rather than the update feed.
+    // Squirrel understands GitHub repositories natively (its error message
+    // asks for exactly this shape), and going straight to the source avoids
+    // depending on how the update service answers a RELEASES request for a
+    // version that is not yet published.
+    const repositoryURL = `https://github.com/${getRepositorySlug()}`
+
+    if (await hasPublishedRelease()) {
+      options.remoteReleases = repositoryURL
+      makingDeltas = true
+    } else {
+      console.log(
+        'No published release found; building a full package with no deltas.'
+      )
+    }
   }
 
   // Upstream signs Windows builds with GitHub's own Azure Code Signing
@@ -145,7 +174,7 @@ function packageWindows() {
         ? readFileSync(releasesPath, 'utf8')
         : undefined
 
-      for (const kind of shouldMakeDelta() ? ['full', 'delta'] : ['full']) {
+      for (const kind of makingDeltas ? ['full', 'delta'] : ['full']) {
         const fromName = `${prefix}-${kind}.nupkg`
         const toName = `${prefix}-win32-${arch}-${kind}.nupkg`
 
@@ -166,4 +195,42 @@ function packageWindows() {
       console.error(`Error packaging: ${e}`)
       process.exit(1)
     })
+}
+
+/**
+ * Whether the repository has at least one published release for Squirrel to
+ * build delta packages against.
+ *
+ * Unauthenticated: this only needs the public releases list, and requiring a
+ * token would make local packaging depend on credentials it otherwise does
+ * not need. A network failure is treated as "no release" -- packaging without
+ * deltas succeeds, whereas guessing wrong the other way fails the build.
+ */
+async function hasPublishedRelease(): Promise<boolean> {
+  const url = `https://api.github.com/repos/${getRepositorySlug()}/releases/latest`
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        Accept: 'application/vnd.github+json',
+        'User-Agent': getWindowsIdentifierName(),
+      },
+    })
+
+    if (response.status === 404) {
+      return false
+    }
+
+    if (!response.ok) {
+      console.warn(
+        `Could not determine whether a release exists (HTTP ${response.status}); skipping deltas.`
+      )
+      return false
+    }
+
+    return true
+  } catch (e) {
+    console.warn(`Could not reach ${url}; skipping deltas.`, e)
+    return false
+  }
 }

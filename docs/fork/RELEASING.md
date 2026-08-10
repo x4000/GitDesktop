@@ -36,7 +36,14 @@ erroring. Hence:
 
 ## macOS
 
-**Releases are Windows-only.** macOS is not in the build matrix at all.
+**Releases are Windows x64 only.**
+
+Windows on arm64 runs x64 builds under emulation, so an arm64 build is an
+optimisation rather than a requirement; it is not worth the build minutes yet.
+The asset naming and the `RELEASES` merge already handle multiple
+architectures, so adding `arm64` back to the matrix is the only change needed.
+
+macOS is not in the build matrix at all.
 
 Two reasons. macOS builds are unsigned, and Squirrel.Mac will not apply an
 update to an unsigned app, so publishing a macOS zip would offer Mac users an
