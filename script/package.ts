@@ -80,7 +80,11 @@ function packageWindows() {
     process.exit(1)
   }
 
-  const iconUrl = 'https://desktop.githubusercontent.com/app-icon.ico'
+  // Shown by Windows in Add/Remove Programs. Squirrel requires a remote URL,
+  // not a local file, so this points at the master artwork in our own repo.
+  // (Upstream used https://desktop.githubusercontent.com/app-icon.ico.)
+  const iconUrl =
+    'https://raw.githubusercontent.com/Arcen/GitDesktop/main/app/static/logos/app-icon.png'
 
   const nugetPkgName = getWindowsIdentifierName()
   const options: electronInstaller.Options = {

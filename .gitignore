@@ -20,3 +20,6 @@ junit*.xml
 *.swp
 tslint-rules/
 playwright-videos/
+
+# Python bytecode from script/fork utilities
+__pycache__/

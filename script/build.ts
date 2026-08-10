@@ -53,7 +53,6 @@ import {
 import { updateLicenseDump } from './licenses/update-license-dump'
 import { verifyInjectedSassVariables } from './validate-sass/validate-all'
 import { join } from 'path'
-import assert from 'assert'
 
 const isPublishableBuild = isPublishable()
 const isDevelopmentBuild = getChannel() === 'development'
@@ -171,11 +170,20 @@ function packageApp() {
   }
 
   const iconPath = getIconDirectory()
+
+  // Assets.car and icon-logo.icon/ are Apple asset-catalog formats, compiled
+  // by Xcode's actool on macOS 26. They cannot be produced on Windows or
+  // Linux, and keeping upstream's copies would mean shipping GitHub's logo, so
+  // this fork does not carry them -- see docs/fork/ICONS.md. Upstream asserts
+  // their presence; we treat them as optional and fall back to the ICNS.
   const assetsCarPath = join(iconPath, 'Assets.car')
-  assert(
-    existsSync(assetsCarPath),
-    `Unable to find Assets.car at ${assetsCarPath}`
-  )
+  const extraResource = existsSync(assetsCarPath) ? [assetsCarPath] : []
+
+  if (extraResource.length === 0 && process.platform === 'darwin') {
+    console.warn(
+      `No Assets.car at ${assetsCarPath}; macOS will use the packaged ICNS.`
+    )
+  }
 
   return packager({
     name: getExecutableName(),
@@ -189,7 +197,7 @@ function packageApp() {
       iconPath,
       process.platform === 'darwin' ? 'icon-logo-legacy.icns' : 'icon-logo'
     ),
-    extraResource: [assetsCarPath],
+    extraResource,
     dir: outRoot,
     overwrite: true,
     tmpdir: false,
