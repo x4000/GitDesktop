@@ -19,8 +19,10 @@ import {
   isDotCom,
   isGHE,
   isGHES,
+  isGitea,
   updateEndpointVersion,
 } from './endpoint-capabilities'
+import { GiteaAPIPath } from './fork/gitea'
 import {
   clearCertificateErrorSuppressionFor,
   suppressCertificateErrorFor,
@@ -2319,6 +2321,11 @@ export function getHTMLURL(endpoint: string): string {
  */
 export function getEnterpriseAPIURL(endpoint: string): string {
   const { host } = new window.URL(endpoint)
+
+  if (isGitea(endpoint)) {
+    // Gitea serves /api/v1; GitHub Enterprise Server serves /api/v3.
+    return `https://${host}${GiteaAPIPath}`
+  }
 
   return isGHE(endpoint) ? `https://api.${host}/` : `https://${host}/api/v3`
 }

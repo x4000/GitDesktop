@@ -64,7 +64,55 @@ describe('endpoint-capabilities', () => {
       )
     })
   })
+
+  // Fork addition. GHES is defined by exclusion, so without an explicit Gitea
+  // check a Gitea instance is treated as GHES running the assumed version and
+  // silently inherits capabilities it does not have.
+  describe('gitea', () => {
+    it('recognizes a known Gitea instance', () => {
+      assert.equal(testGitea(true), true)
+      assert.equal(testGitea(false), false)
+    })
+
+    it('does not treat Gitea as GHES', () => {
+      // The exact constraint that would otherwise match via assumedGHESVersion.
+      assert.equal(
+        testEndpoint(GiteaEndpoint, { es: '>= 3.1.0' }),
+        false,
+        'Gitea satisfied a GitHub Enterprise Server constraint'
+      )
+    })
+
+    it('defaults every GitHub-only capability to unsupported', () => {
+      // The whole point of `gitea` defaulting to false: predicates that never
+      // mention Gitea must answer no, so upstream capability checks degrade
+      // safely without each one having to be revisited.
+      for (const constraint of [
+        { dotcom: true },
+        { dotcom: true, es: '>= 3.4.0' },
+        { es: '>= 3.0.0' },
+      ] as ReadonlyArray<VersionConstraint>) {
+        assert.equal(
+          testEndpoint(GiteaEndpoint, constraint),
+          false,
+          `Gitea unexpectedly satisfied ${JSON.stringify(constraint)}`
+        )
+      }
+    })
+
+    it('does not mistake Gitea for github.com or ghe.com', () => {
+      assert.equal(testEndpoint(GiteaEndpoint, { dotcom: true }), false)
+      assert.equal(testEndpoint(GiteaEndpoint, { ghe: true }), false)
+    })
+  })
 })
+
+/** A registered instance from KnownGiteaInstances. */
+const GiteaEndpoint = 'https://git.arcengames.com'
+
+function testGitea(constraint: boolean) {
+  return testEndpoint(GiteaEndpoint, { gitea: constraint })
+}
 
 function testDotCom(
   constraint: boolean,

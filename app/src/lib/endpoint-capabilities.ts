@@ -1,6 +1,9 @@
 import * as semver from 'semver'
 import { getDotComAPIEndpoint } from './api'
 import { assertNonNullable } from './fatal-error'
+import { isGitea } from './fork/gitea'
+
+export { isGitea }
 
 export type VersionConstraint = {
   /**
@@ -19,6 +22,16 @@ export type VersionConstraint = {
    * 3.1.0), defaults to false
    */
   es?: boolean | string
+  /**
+   * Whether this constraint will be satisfied when using Gitea, defaults to
+   * false.
+   *
+   * Defaulting to false is the point: every existing `supports*` predicate
+   * omits this field, so all of them answer "no" for a Gitea endpoint without
+   * needing to be touched. Features that Gitea genuinely does implement opt in
+   * explicitly by setting `gitea: true`.
+   */
+  gitea?: boolean
 }
 
 /**
@@ -63,9 +76,15 @@ export const isGHE = (ep: string) => new URL(ep).hostname.endsWith('.ghe.com')
 
 /**
  * Whether or not the given endpoint URI appears to point to a GitHub Enterprise
- * Server instance
+ * Server instance.
+ *
+ * Note that this is defined by exclusion -- anything not recognised as
+ * something else is assumed to be GHES. Gitea must therefore be excluded
+ * explicitly, or a Gitea instance inherits every GHES capability (and, via
+ * `assumedGHESVersion`, is treated as GHES 3.1.0).
  */
-export const isGHES = (ep: string) => !isDotCom(ep) && !isGHE(ep)
+export const isGHES = (ep: string) =>
+  !isDotCom(ep) && !isGHE(ep) && !isGitea(ep)
 
 export function getEndpointVersion(endpoint: string) {
   const key = endpointVersionKey(endpoint)
@@ -127,10 +146,14 @@ function checkConstraint(
  *       Consumers should use the various `supports*` methods instead.
  */
 export const endpointSatisfies =
-  ({ dotcom, ghe, es }: VersionConstraint, getVersion = getEndpointVersion) =>
+  (
+    { dotcom, ghe, es, gitea }: VersionConstraint,
+    getVersion = getEndpointVersion
+  ) =>
   (ep: string) =>
     checkConstraint(dotcom, isDotCom(ep)) ||
     checkConstraint(ghe ?? dotcom, isGHE(ep)) ||
+    checkConstraint(gitea, isGitea(ep)) ||
     checkConstraint(es, isGHES(ep), getVersion(ep) ?? assumedGHESVersion)
 
 /**

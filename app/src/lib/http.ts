@@ -1,5 +1,6 @@
 import * as appProxy from '../ui/lib/app-proxy'
 import { URL } from 'url'
+import { isGitea } from './fork/gitea'
 
 /** The HTTP methods available. */
 export type HTTPMethod = 'GET' | 'POST' | 'PUT' | 'HEAD' | 'DELETE'
@@ -131,7 +132,13 @@ export function request(
   }
 
   if (token) {
-    headers['Authorization'] = `Bearer ${token}`
+    // Gitea requires the literal word "token" before a personal access token
+    // and rejects the RFC 6750 "Bearer" scheme for them. Its OAuth2 access
+    // tokens do accept "Bearer", but "token" works for both, so use it
+    // uniformly for Gitea rather than plumbing the credential kind down here.
+    headers['Authorization'] = isGitea(endpoint)
+      ? `token ${token}`
+      : `Bearer ${token}`
   }
 
   headers = {
