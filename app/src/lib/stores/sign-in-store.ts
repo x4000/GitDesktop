@@ -12,7 +12,8 @@ import {
   getDotComAPIEndpoint,
   getEnterpriseAPIURL,
   requestOAuthToken,
-  getOAuthAuthorizationURL,
+  getOAuthClientID,
+  oauthScopes,
 } from '../../lib/api'
 
 import { TypedBaseStore } from './base-store'
@@ -21,6 +22,10 @@ import { shell } from '../app-shell'
 import noop from 'lodash/noop'
 import { AccountsStore } from './accounts-store'
 import { isGitea, probeIsGitea, setEndpointKind } from '../fork/gitea'
+import {
+  requestDeviceCode,
+  pollForDeviceToken,
+} from '../fork/github-device-flow'
 
 /**
  * An enumeration of the possible steps that the sign in
@@ -129,6 +134,16 @@ export interface IAuthenticationState extends ISignInState {
     onAuthCompleted: (account: Account) => void
     onAuthError: (error: Error) => void
   }
+
+  /**
+   * Present while a device flow sign-in is waiting on the user. Carries the
+   * code they have to enter and where to enter it. See
+   * `lib/fork/github-device-flow.ts`.
+   */
+  readonly deviceFlow?: {
+    readonly userCode: string
+    readonly verificationUri: string
+  }
 }
 
 /**
@@ -156,6 +171,9 @@ export type SignInResult =
  */
 export class SignInStore extends TypedBaseStore<SignInState | null> {
   private state: SignInState | null = null
+
+  /** Stops the device flow poll loop when a sign-in is abandoned. */
+  private deviceFlowAbort: AbortController | null = null
 
   private accounts: ReadonlyArray<Account> = []
 
@@ -214,6 +232,11 @@ export class SignInStore extends TypedBaseStore<SignInState | null> {
     const currentState = this.state
     this.state?.resultCallback({ kind: 'cancelled' })
     this.setState(null)
+
+    // Otherwise the device flow keeps polling GitHub every few seconds for the
+    // rest of the session after the user walks away from the dialog.
+    this.deviceFlowAbort?.abort()
+    this.deviceFlowAbort = null
 
     if (currentState?.kind === SignInStep.Authentication) {
       currentState.oauthState?.onAuthError(new Error('cancelled'))
@@ -298,52 +321,103 @@ export class SignInStore extends TypedBaseStore<SignInState | null> {
       return
     }
 
-    const csrfToken = crypto.randomUUID()
+    // Fork: the device flow replaces upstream's authorization-code flow, which
+    // depended on GitHub redirecting to a protocol scheme registered against
+    // *their* OAuth application. We register a different scheme, so that
+    // redirect goes nowhere. The device flow needs no redirect and no client
+    // secret. See lib/fork/github-device-flow.ts.
+    return this.authenticateWithDeviceFlow(currentState)
+  }
 
-    new Promise<Account>((resolve, reject) => {
-      const { endpoint, resultCallback } = currentState
-      log.info('[SignInStore] initializing OAuth flow')
+  private async authenticateWithDeviceFlow(
+    currentState: IAuthenticationState | IExistingAccountWarning
+  ): Promise<void> {
+    const { endpoint, resultCallback } = currentState
+    const clientId = getOAuthClientID()
+
+    if (!clientId) {
+      this.setState({
+        kind: SignInStep.Authentication,
+        endpoint,
+        resultCallback,
+        loading: false,
+        error: new Error(
+          'This build has no OAuth client ID, so it cannot sign in to GitHub.'
+        ),
+      })
+      return
+    }
+
+    this.deviceFlowAbort?.abort()
+    const abort = new AbortController()
+    this.deviceFlowAbort = abort
+
+    this.setState({
+      kind: SignInStep.Authentication,
+      endpoint,
+      resultCallback,
+      error: null,
+      loading: true,
+    })
+
+    try {
+      const start = await requestDeviceCode(endpoint, clientId, oauthScopes)
+
+      if (abort.signal.aborted) {
+        return
+      }
+
+      // Show the code before opening the browser: the browser steals focus,
+      // and a user who lands on the verification page without having seen the
+      // code has nothing to type.
       this.setState({
         kind: SignInStep.Authentication,
         endpoint,
         resultCallback,
         error: null,
         loading: true,
-        oauthState: {
-          state: csrfToken,
-          endpoint,
-          onAuthCompleted: resolve,
-          onAuthError: reject,
+        deviceFlow: {
+          userCode: start.userCode,
+          verificationUri: start.verificationUri,
         },
       })
-      shell.openExternal(getOAuthAuthorizationURL(endpoint, csrfToken))
-    })
-      .then(account => {
-        if (!this.state || this.state.kind !== SignInStep.Authentication) {
-          // Looks like the sign in flow has been aborted
-          log.warn('[SignInStore] account resolved but session has changed')
-          return
-        }
 
-        log.info('[SignInStore] account resolved')
-        this.emitAuthenticate(account)
-        this.setState({
-          kind: SignInStep.Success,
-          resultCallback: this.state.resultCallback,
-        })
+      shell.openExternal(start.verificationUri)
+
+      const token = await pollForDeviceToken(
+        endpoint,
+        clientId,
+        start,
+        abort.signal
+      )
+
+      const account = await fetchUser(endpoint, token)
+
+      if (abort.signal.aborted) {
+        return
+      }
+
+      this.emitAuthenticate(account)
+      this.setState({ kind: SignInStep.Success, resultCallback })
+    } catch (e) {
+      if (abort.signal.aborted || e.message === 'cancelled') {
+        return
+      }
+
+      log.warn('[SignInStore] device flow sign in failed', e)
+
+      this.setState({
+        kind: SignInStep.Authentication,
+        endpoint,
+        resultCallback,
+        loading: false,
+        error: e instanceof Error ? e : new Error(`${e}`),
       })
-      .catch(e => {
-        // Make sure we're still in the same sign in session
-        if (
-          this.state?.kind === SignInStep.Authentication &&
-          this.state.oauthState?.state === csrfToken
-        ) {
-          log.info('[SignInStore] error with OAuth flow', e)
-          this.setState({ ...this.state, error: e, loading: false })
-        } else {
-          log.info(`[SignInStore] OAuth error but session has changed: ${e}`)
-        }
-      })
+    } finally {
+      if (this.deviceFlowAbort === abort) {
+        this.deviceFlowAbort = null
+      }
+    }
   }
 
   /**

@@ -1,0 +1,27 @@
+// Fork: GitHub device flow sign-in. See app/src/ui/fork/device-flow-instructions.tsx
+
+.fork-device-flow {
+  .user-code {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing);
+    margin: var(--spacing) 0;
+
+    .code {
+      // The user has to read this off the screen and type it into a browser
+      // that is covering the app, so it is deliberately the loudest thing in
+      // the dialog. Monospace and letter-spacing so characters that look alike
+      // (0/O, 1/I) can be told apart.
+      font-family: var(--font-family-monospace);
+      font-size: var(--font-size-xxl);
+      font-weight: var(--font-weight-semibold);
+      letter-spacing: 0.15em;
+      user-select: text;
+      padding: var(--spacing-half) var(--spacing);
+      border: var(--base-border);
+      border-radius: var(--border-radius);
+      background: var(--box-alt-background-color);
+    }
+  }
+}

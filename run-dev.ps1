@@ -122,6 +122,29 @@ try {
     }
 
     if ($needsBuild) {
+        # The build deletes dist\ before repackaging, which Windows refuses
+        # while a previous instance still has files in it open. The failure
+        # surfaces as a bare "EPERM, Permission denied" on the directory,
+        # several hundred lines into an otherwise successful webpack run, and
+        # says nothing about the app being open. Catch it here instead.
+        $running = @(Get-Process 'GitDesktop-dev' -ErrorAction SilentlyContinue)
+
+        if ($running.Count -gt 0) {
+            Write-Host ""
+            Write-Host "GitDesktop-dev is already running ($($running.Count) process(es))." -ForegroundColor Yellow
+            Write-Host "A rebuild cannot replace dist\ while it is open." -ForegroundColor Yellow
+            $answer = Read-Host "Close it and continue? [Y/n]"
+
+            if ($answer -eq '' -or $answer -match '^[Yy]') {
+                $running | Stop-Process -Force
+                # Stop-Process returns before the handles are actually gone.
+                Start-Sleep -Milliseconds 750
+                Write-Host "Closed." -ForegroundColor DarkGray
+            } else {
+                throw "Close GitDesktop-dev and run this again, or pass -NoBuild to launch the existing build."
+            }
+        }
+
         Write-Step "Building development app (about a minute)"
         Invoke-Yarn @('build:dev')
     } else {

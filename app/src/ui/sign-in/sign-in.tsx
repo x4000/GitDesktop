@@ -17,6 +17,7 @@ import { Ref } from '../lib/ref'
 import { getHTMLURL } from '../../lib/api'
 import { usesTokenAuthentication } from '../../lib/fork/gitea'
 import { GiteaTokenFields } from '../fork/gitea-token-form'
+import { DeviceFlowInstructions } from '../fork/device-flow-instructions'
 
 interface ISignInProps {
   readonly dispatcher: Dispatcher
@@ -40,11 +41,13 @@ const SignInWithBrowserTitle = __DARWIN__
 
 const DefaultTitle = 'Sign in'
 
+// Describes the device flow, not upstream's redirect flow: nothing redirects
+// back to the app any more, so promising that it will just leaves the user
+// waiting in their browser for something that is not going to happen.
 const browserSignInInfoContent = (
   <p>
-    Your browser will redirect you back to GitHub Desktop once you've signed in.
-    If your browser asks for your permission to launch GitHub Desktop, please
-    allow it.
+    {__APP_NAME__} will show you a short code to enter in your browser. Your
+    browser will open automatically.
   </p>
 )
 
@@ -147,6 +150,11 @@ export class SignIn extends React.Component<ISignInProps, ISignInState> {
         if (usesTokenAuthentication(state.endpoint)) {
           primaryButtonText = 'Sign in'
           disableSubmit = this.state.token.length === 0
+        } else if (state.deviceFlow) {
+          // The device flow is already under way and completes on its own once
+          // the user authorizes in the browser; there is nothing to submit.
+          primaryButtonText = 'Waiting for authorization…'
+          disableSubmit = true
         } else {
           primaryButtonText = continueWithBrowserLabel
         }
@@ -208,11 +216,26 @@ export class SignIn extends React.Component<ISignInProps, ISignInState> {
     return (
       <DialogContent>
         {credentialHelperInfo}
-        {usesTokenAuthentication(state.endpoint)
-          ? this.renderTokenSignIn(state)
-          : browserSignInInfoContent}
+        {this.renderAuthenticationContent(state)}
       </DialogContent>
     )
+  }
+
+  private renderAuthenticationContent(state: IAuthenticationState) {
+    if (usesTokenAuthentication(state.endpoint)) {
+      return this.renderTokenSignIn(state)
+    }
+
+    if (state.deviceFlow) {
+      return (
+        <DeviceFlowInstructions
+          userCode={state.deviceFlow.userCode}
+          verificationUri={state.deviceFlow.verificationUri}
+        />
+      )
+    }
+
+    return browserSignInInfoContent
   }
 
   /**

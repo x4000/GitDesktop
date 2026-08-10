@@ -14,6 +14,7 @@ import { Ref } from './ref'
 import { getHTMLURL } from '../../lib/api'
 import { usesTokenAuthentication } from '../../lib/fork/gitea'
 import { GiteaTokenForm } from '../fork/gitea-token-form'
+import { DeviceFlowInstructions } from '../fork/device-flow-instructions'
 
 interface ISignInProps {
   readonly signInState: SignInState
@@ -79,6 +80,18 @@ export class SignIn extends React.Component<ISignInProps, {}> {
           onSubmit={this.onTokenSignIn}
           additionalButtons={children}
         />
+      )
+    }
+
+    if (state.kind === SignInStep.Authentication && state.deviceFlow) {
+      return (
+        <>
+          <DeviceFlowInstructions
+            userCode={state.deviceFlow.userCode}
+            verificationUri={state.deviceFlow.verificationUri}
+          />
+          {children}
+        </>
       )
     }
 

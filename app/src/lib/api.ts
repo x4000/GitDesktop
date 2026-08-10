@@ -143,7 +143,16 @@ if (!ClientID || !ClientID.length || !ClientSecret || !ClientSecret.length) {
 export type GitHubAccountType = 'User' | 'Organization'
 
 /** The OAuth scopes we want to request */
-const oauthScopes = ['repo', 'user', 'workflow']
+export const oauthScopes = ['repo', 'user', 'workflow']
+
+/**
+ * The OAuth client ID this build authenticates with.
+ *
+ * Exported for the device flow (see lib/fork/github-device-flow.ts). Public by
+ * design -- the device flow transmits it in plaintext and it is readable from
+ * the binary either way.
+ */
+export const getOAuthClientID = () => ClientID
 
 /**
  * Information about a repository as returned by the GitHub API.

@@ -4,8 +4,13 @@ import * as octicons from '../octicons/octicons.generated'
 import { Form } from './form'
 import { Button } from './button'
 
-/** Text to let the user know their browser will send them back to GH Desktop */
-export const BrowserRedirectMessage = `Your browser will redirect you back to ${__APP_NAME__} once you've signed in. If your browser asks for your permission to launch ${__APP_NAME__} please allow it to.`
+/**
+ * Describes the device flow. Upstream's wording promised the browser would
+ * redirect back to the app, which was true of the authorization-code flow it
+ * used; this fork signs in with a code the user types instead, and nothing
+ * redirects back. See lib/fork/github-device-flow.ts.
+ */
+export const BrowserRedirectMessage = `${__APP_NAME__} will show you a short code to enter in your browser. Your browser will open automatically.`
 
 interface IAuthenticationFormProps {
   /**
