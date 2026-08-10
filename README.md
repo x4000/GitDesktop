@@ -40,7 +40,17 @@ upstream files are kept to the minimum number of lines that will do the job.
 
 ## Building
 
-Build instructions are upstream's and still apply:
+On Windows, double-click **`run-dev.cmd`**. It installs dependencies if needed,
+rebuilds only when main-process code has changed, and launches the dev app.
+
+Renderer changes hot-reload while it runs, so you rarely need to restart. Main
+process changes do need a rebuild, which it detects by timestamp — pass
+`-Rebuild` to force one, or `-NoBuild` to skip straight to launching.
+
+The dev build has a teal icon and is named `GitDesktop-dev`, so it will not
+collide with an installed GitHub Desktop or a release build.
+
+Full build instructions are upstream's and still apply:
 [docs/contributing/setup.md](./docs/contributing/setup.md).
 
 After cloning, run this once to configure the merge tooling:
