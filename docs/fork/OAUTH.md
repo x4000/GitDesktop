@@ -105,16 +105,32 @@ offered for every Gitea endpoint; both sign-in surfaces (the Preferences dialog
 and the Welcome flow) share one implementation in
 `app/src/ui/fork/gitea-token-form.tsx`.
 
-Remaining, in rough priority order:
+**GitHub device flow works and is verified.** Signing in, committing and
+pushing all succeed against github.com. No client secret is involved, and the
+client ID above is the build default, so a fresh clone signs in with no
+environment setup.
 
-1. **GitHub device flow.** Replaces the authorization-code exchange in
-   `app/src/lib/api.ts` and drops `__OAUTH_SECRET__` from the build. Until this
-   lands, release builds authenticate to GitHub through *upstream's development
-   OAuth application* — fine for development, not acceptable to ship.
-2. **Gitea PKCE** for registered instances, so they get browser sign-in instead
+Remaining:
+
+1. **Gitea PKCE** for registered instances, so they get browser sign-in instead
    of pasting a token. Token sign-in already works everywhere, so this is
    convenience rather than capability. See the warning on
    `usesTokenAuthentication` before changing it.
+
+### Diagnosing a device flow failure
+
+`POST https://github.com/login/device/code` is unauthenticated, so a client ID
+can be tested directly without building anything:
+
+```bash
+curl -s -X POST https://github.com/login/device/code \
+  -H "Accept: application/json" -H "Content-Type: application/json" \
+  -d '{"client_id":"YOUR_ID","scope":"repo user workflow"}'
+```
+
+A `device_code` in the response means the application is configured correctly.
+`{"error":"device_flow_disabled"}` means "Enable Device Flow" is not ticked on
+it.
 
 ### A trap worth knowing about
 

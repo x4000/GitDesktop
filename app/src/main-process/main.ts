@@ -109,7 +109,13 @@ const protocolLauncherArg = '--protocol-launcher'
 // swallows the other's callbacks. Upstream's Desktop Classic aliases are
 // dropped entirely -- they are not ours to claim.
 const possibleProtocols = new Set(['x-gitdesktop-client'])
-if (__DEV_SECRETS__) {
+// Keyed on __DEV__ rather than upstream's __DEV_SECRETS__. That flag means
+// "no client secret was supplied at build time", which used to imply a
+// development build; with the device flow there is never a client secret, so
+// it is now always true and a production build would register the dev scheme.
+// script/build.ts already keys the macOS plist on the build channel, so this
+// also stops the two disagreeing.
+if (__DEV__) {
   possibleProtocols.add('x-gitdesktop-dev-auth')
 } else {
   possibleProtocols.add('x-gitdesktop-auth')

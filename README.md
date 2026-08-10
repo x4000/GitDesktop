@@ -11,11 +11,11 @@ Everything else tracks upstream and is merged in periodically. This is not a
 general-purpose replacement for GitHub Desktop — if you are not on our team,
 you almost certainly want [the original](https://desktop.github.com/).
 
-> **Status: early.** The release, update, and branding pipeline is in place, and
-> Gitea sign-in works — signing in with a personal access token, listing
-> repositories, and fetching are all verified against a real instance. The
-> sidebar rework has not been started, and GitHub sign-in still runs through
-> upstream's development OAuth application, which is not shippable.
+> **Status: working, not yet released.** Sign-in, cloning, committing and
+> pushing are verified against both github.com and a real Gitea instance, and
+> the repository list is a permanent left-hand pane. The release, update and
+> branding pipeline is in place but has never cut a release; macOS builds are
+> unsigned and therefore manual-install only.
 
 ## Installing
 
