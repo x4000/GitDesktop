@@ -12,29 +12,20 @@ import {
   getWindowsInstallerName,
   shouldMakeDelta,
   getUpdatesURL,
-  isPublishable,
   getBundleSizes,
   getDistRoot,
   getDistArchitecture,
   getIconDirectory,
 } from './dist-info'
-import { isGitHubActions } from './build-platforms'
-import { existsSync, rmSync, writeFileSync } from 'fs'
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { getVersion } from '../app/package-info'
 import { computeBundleHashSync } from '../app/src/lib/compute-bundle-hash'
 import { rename } from 'fs/promises'
 import { join } from 'path'
-import { assertNonNullable } from '../app/src/lib/fatal-error'
 
 const distPath = getDistPath()
 const productName = getProductName()
 const outputDir = getDistRoot()
-
-const assertExistsSync = (path: string) => {
-  if (!existsSync(path)) {
-    throw new Error(`Expected ${path} to exist`)
-  }
-}
 
 if (process.platform === 'darwin') {
   packageOSX()
@@ -107,32 +98,22 @@ function packageWindows() {
   }
 
   if (shouldMakeDelta()) {
-    const url = new URL(getUpdatesURL())
-    // Make sure Squirrel.Windows isn't affected by partially or completely
-    // disabled releases.
-    url.searchParams.set('bypassStaggeredRelease', '1')
-    options.remoteReleases = url.toString()
+    // Squirrel.Windows fetches the previous RELEASES from here to build the
+    // delta package against. Upstream appended a 'bypassStaggeredRelease'
+    // query parameter, which is a central.github.com feature and meaningless
+    // to update.electronjs.org, so it is dropped.
+    options.remoteReleases = getUpdatesURL()
   }
 
-  if (isGitHubActions() && isPublishable()) {
-    assertNonNullable(process.env.RUNNER_TEMP, 'Missing RUNNER_TEMP env var')
-
-    const acsPath = join(process.env.RUNNER_TEMP, 'acs')
-    const dlibPath = join(acsPath, 'bin', 'x64', 'Azure.CodeSigning.Dlib.dll')
-
-    assertExistsSync(dlibPath)
-
-    const metadataPath = join(acsPath, 'metadata.json')
-    const acsMetadata = {
-      Endpoint: 'https://wus3.codesigning.azure.net/',
-      CodeSigningAccountName: 'GitHubInc',
-      CertificateProfileName: 'GitHubInc',
-      CorrelationId: `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`,
-    }
-    writeFileSync(metadataPath, JSON.stringify(acsMetadata))
-
-    options.signWithParams = `/v /fd SHA256 /tr "http://timestamp.acs.microsoft.com" /td SHA256 /dlib "${dlibPath}" /dmdf "${metadataPath}"`
-  }
+  // Upstream signs Windows builds with GitHub's own Azure Code Signing
+  // certificate profile ('GitHubInc'), which we obviously cannot use. Windows
+  // builds from this fork are unsigned.
+  //
+  // Note that update.electronjs.org does NOT require signed Windows builds --
+  // it only mandates code signing for macOS and MSIX. Unsigned installers do
+  // trigger a SmartScreen warning on first run for users, which is the cost of
+  // not buying a certificate. If a certificate is acquired later, set
+  // options.signWithParams here.
 
   console.log('Packaging for Windows…')
   electronInstaller
@@ -141,17 +122,40 @@ function packageWindows() {
     .then(async () => {
       // electron-winstaller (more specifically Squirrel.Windows) doesn't let
       // us control the name of the nuget packages but we want them to include
-      // the architecture similar to how the setup exe and msi do so we'll just
-      // have to rename them here after the fact.
+      // the architecture similar to how the setup exe does so we'll just have
+      // to rename them here after the fact.
+      //
+      // The '-win32-<arch>-' infix (rather than upstream's '-<arch>-') is
+      // required by update.electronjs.org's asset matcher. Because a single
+      // GitHub Release serves every architecture, and the service always
+      // fetches an asset literally named 'RELEASES', both architectures'
+      // entries end up in one RELEASES file -- the service then picks the
+      // right .nupkg out of it per architecture. That only works if the
+      // filenames in RELEASES are arch-qualified, so we rewrite the file to
+      // match the names we just renamed to.
       const arch = getDistArchitecture()
       const prefix = `${getWindowsIdentifierName()}-${getVersion()}`
+      const releasesPath = join(outputDir, 'RELEASES')
+
+      let releases = existsSync(releasesPath)
+        ? readFileSync(releasesPath, 'utf8')
+        : undefined
 
       for (const kind of shouldMakeDelta() ? ['full', 'delta'] : ['full']) {
-        const from = join(outputDir, `${prefix}-${kind}.nupkg`)
-        const to = join(outputDir, `${prefix}-${arch}-${kind}.nupkg`)
+        const fromName = `${prefix}-${kind}.nupkg`
+        const toName = `${prefix}-win32-${arch}-${kind}.nupkg`
 
-        console.log(`Renaming ${from} to ${to}`)
-        await rename(from, to)
+        console.log(`Renaming ${fromName} to ${toName}`)
+        await rename(join(outputDir, fromName), join(outputDir, toName))
+
+        // Squirrel generated RELEASES before we renamed anything, so its
+        // entries still reference the original filenames.
+        releases = releases?.split(fromName).join(toName)
+      }
+
+      if (releases !== undefined) {
+        console.log(`Rewriting ${releasesPath} to match renamed packages`)
+        writeFileSync(releasesPath, releases, 'utf8')
       }
     })
     .catch(e => {

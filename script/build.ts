@@ -224,12 +224,10 @@ function packageApp() {
     protocols: [
       {
         name: getBundleID(),
+        // Keep in sync with `possibleProtocols` in app/src/main-process/main.ts.
         schemes: [
-          !isDevelopmentBuild
-            ? 'x-github-desktop-auth'
-            : 'x-github-desktop-dev-auth',
-          'x-github-client',
-          'github-mac',
+          !isDevelopmentBuild ? 'x-gitdesktop-auth' : 'x-gitdesktop-dev-auth',
+          'x-gitdesktop-client',
         ],
       },
     ],

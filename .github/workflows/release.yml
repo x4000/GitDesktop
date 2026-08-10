@@ -1,0 +1,192 @@
+name: Release
+
+# Fork-owned. Replaces upstream's draft-release.yml / release-pr.yml, which
+# published to central.github.com.
+#
+# Trigger: pushing a semver tag. The tag MUST be plain semver ('3.6.4' or
+# 'v3.6.4') -- update.electronjs.org runs semver.valid() on the tag name and
+# ignores anything else, so upstream's 'release-3.6.4' convention would produce
+# a release the update feed never sees.
+#
+# The published GitHub Release must not be a draft or a prerelease, for the
+# same reason.
+
+on:
+  push:
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+  # Manual runs build and upload artifacts but never publish a release --
+  # GITHUB_REF_NAME is a branch name outside a tag push, and publishing under
+  # that name would create a release the update feed cannot parse.
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: 24.15.0
+
+jobs:
+  build:
+    name: ${{ matrix.friendlyName }} ${{ matrix.arch }}
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: true
+      matrix:
+        os: [macos-14-xlarge, windows-2022]
+        arch: [x64, arm64]
+        include:
+          - os: macos-14-xlarge
+            friendlyName: macOS
+          - os: windows-2022
+            friendlyName: Windows
+    timeout-minutes: 60
+    env:
+      RELEASE_CHANNEL: production
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - uses: ./.github/actions/setup-ci-environment
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          arch: ${{ matrix.arch }}
+
+      - name: Verify tag matches app/package.json version
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" != "push" ]; then
+            echo "Not a tag build; skipping version check."
+            exit 0
+          fi
+          tag="${GITHUB_REF_NAME#v}"
+          pkg="$(node -p "require('./app/package.json').version")"
+          if [ "$tag" != "$pkg" ]; then
+            echo "::error::Tag '$tag' does not match app/package.json version '$pkg'."
+            echo "The update feed keys off the tag, and the app compares against"
+            echo "its baked-in version. A mismatch means clients either never see"
+            echo "the update or re-download it forever."
+            exit 1
+          fi
+
+      - name: Build production app
+        run: yarn build:prod
+        env:
+          # Device flow only needs the client id -- there is deliberately no
+          # DESKTOP_OAUTH_CLIENT_SECRET here. See docs/fork/OAUTH.md.
+          DESKTOP_OAUTH_CLIENT_ID: ${{ secrets.DESKTOP_OAUTH_CLIENT_ID }}
+          # macOS signing/notarization. update.electronjs.org REQUIRES signed
+          # macOS builds; Squirrel.Mac will refuse to apply an update to an
+          # unsigned app. If these secrets are absent the build still succeeds,
+          # but macOS auto-update will not work.
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APPLICATION_CERT: ${{ secrets.APPLE_APPLICATION_CERT }}
+          KEY_PASSWORD: ${{ secrets.APPLE_APPLICATION_CERT_PASSWORD }}
+          npm_config_arch: ${{ matrix.arch }}
+          TARGET_ARCH: ${{ matrix.arch }}
+
+      - name: Package production app
+        run: yarn package
+        env:
+          npm_config_arch: ${{ matrix.arch }}
+
+      # Windows produces a RELEASES file per architecture, but a GitHub Release
+      # can only hold one asset named 'RELEASES' and update.electronjs.org
+      # always fetches exactly that name. We stage each arch's copy under a
+      # distinct name and merge them in the release job.
+      - name: Stage Windows RELEASES
+        if: runner.os == 'Windows'
+        shell: bash
+        run: mv dist/RELEASES "dist/RELEASES-${{ matrix.arch }}"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.friendlyName }}-${{ matrix.arch }}
+          path: |
+            dist/GitDesktop-darwin-${{ matrix.arch }}.zip
+            dist/GitDesktop-*-win32-${{ matrix.arch }}-*.nupkg
+            dist/GitDesktopSetup-win32-${{ matrix.arch }}.exe
+            dist/RELEASES-${{ matrix.arch }}
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Merge per-arch RELEASES files
+        shell: bash
+        working-directory: artifacts
+        run: |
+          set -euo pipefail
+          # Squirrel's RELEASES format is one entry per line:
+          #   <SHA1> <nupkg filename> <size>
+          # Because script/package.ts rewrote each entry to use the
+          # arch-qualified .nupkg name, the two files can simply be
+          # concatenated. update.electronjs.org reads this single file and
+          # substitutes the .nupkg matching the requested architecture.
+          : > RELEASES
+          for f in RELEASES-x64 RELEASES-arm64; do
+            if [ -f "$f" ]; then
+              cat "$f" >> RELEASES
+              rm "$f"
+            fi
+          done
+          if [ ! -s RELEASES ]; then
+            echo "::error::Merged RELEASES file is empty."
+            exit 1
+          fi
+          echo "Merged RELEASES:"
+          cat RELEASES
+
+      - name: Verify asset names match the update feed matcher
+        shell: bash
+        working-directory: artifacts
+        run: |
+          set -euo pipefail
+          fail=0
+          check() {
+            if ! ls $1 >/dev/null 2>&1; then
+              echo "::error::Missing expected asset matching '$1'"
+              fail=1
+            fi
+          }
+          # darwin: /.*-(mac|darwin|osx).*\.zip$/, arm64 keyed on '-arm64'
+          check 'GitDesktop-darwin-x64.zip'
+          check 'GitDesktop-darwin-arm64.zip'
+          # win32: /.*-win32-(ia32|x64|arm64).*/
+          check 'GitDesktopSetup-win32-x64.exe'
+          check 'GitDesktopSetup-win32-arm64.exe'
+          check '*-win32-x64-full.nupkg'
+          check '*-win32-arm64-full.nupkg'
+          check 'RELEASES'
+          exit $fail
+
+      # Uses the built-in gh CLI rather than a third-party release action --
+      # one less external dependency in the publishing path.
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Neither --draft nor --prerelease: update.electronjs.org skips both
+          # kinds of release entirely, so either flag ships an update nobody
+          # receives.
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "${GITHUB_REF_NAME}" \
+            --generate-notes \
+            artifacts/*

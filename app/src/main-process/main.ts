@@ -102,17 +102,17 @@ function getExtraErrorContext(): Record<string, string> {
 /** Extra argument for the protocol launcher on Windows */
 const protocolLauncherArg = '--protocol-launcher'
 
-const possibleProtocols = new Set(['x-github-client'])
+// Fork identity: these must NOT overlap with upstream GitHub Desktop's
+// protocols ('x-github-client', 'x-github-desktop-auth', 'github-mac',
+// 'github-windows'). Protocol registration is last-writer-wins at the OS
+// level, so sharing a scheme means whichever app registered most recently
+// swallows the other's callbacks. Upstream's Desktop Classic aliases are
+// dropped entirely -- they are not ours to claim.
+const possibleProtocols = new Set(['x-gitdesktop-client'])
 if (__DEV_SECRETS__) {
-  possibleProtocols.add('x-github-desktop-dev-auth')
+  possibleProtocols.add('x-gitdesktop-dev-auth')
 } else {
-  possibleProtocols.add('x-github-desktop-auth')
-}
-// Also support Desktop Classic's protocols.
-if (__DARWIN__) {
-  possibleProtocols.add('github-mac')
-} else if (__WIN32__) {
-  possibleProtocols.add('github-windows')
+  possibleProtocols.add('x-gitdesktop-auth')
 }
 
 // On Windows, in order to get notifications properly working for dev builds,

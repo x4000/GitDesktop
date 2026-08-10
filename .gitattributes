@@ -2,3 +2,18 @@
 /app/static/win32/github.sh eol=lf
 
 .github/workflows/*.lock.yml linguist-generated=true merge=ours
+
+# --- fork-owned paths -------------------------------------------------------
+# These files are ours outright. When merging from upstream we always keep our
+# version rather than trying to reconcile the two. Requires the "ours" merge
+# driver to be registered locally -- run `yarn fork:setup` after cloning.
+#
+# NOTE: `merge=ours` only applies to files that exist on BOTH sides. Files we
+# delete outright (script/draft-release/**) stay deleted without needing an
+# entry here; they are listed for documentation only if reintroduced upstream.
+/.github/workflows/release.yml         merge=ours
+/.github/workflows/draft-release.yml   merge=ours
+/.github/workflows/release-pr.yml      merge=ours
+/script/fork/**                        merge=ours
+/docs/fork/**                          merge=ours
+/app/src/ui/fork/**                    merge=ours

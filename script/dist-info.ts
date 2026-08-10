@@ -1,7 +1,11 @@
 import * as Path from 'path'
 import * as Fs from 'fs'
 
-import { getProductName, getVersion } from '../app/package-info'
+import {
+  getProductName,
+  getRepositorySlug,
+  getVersion,
+} from '../app/package-info'
 import { join } from 'path'
 
 const productName = getProductName()
@@ -33,7 +37,11 @@ export function getExecutableName() {
 }
 
 export function getOSXZipName() {
-  return `${productName}-${getDistArchitecture()}.zip`
+  // The 'darwin' infix is not cosmetic: update.electronjs.org only recognises
+  // a macOS asset if the filename matches /.*-(mac|darwin|osx).*\.zip$/, and
+  // picks arm64 by the presence of '-arm64'. Renaming this breaks auto-update
+  // silently -- the feed returns 204 and the app just never updates.
+  return `${productName}-darwin-${getDistArchitecture()}.zip`
 }
 
 export function getOSXZipPath() {
@@ -51,7 +59,11 @@ export function getWindowsInstallerPath() {
 
 export function getWindowsStandaloneName() {
   const productName = getExecutableName()
-  return `${productName}Setup-${getDistArchitecture()}.exe`
+  // As with getOSXZipName, the '-win32-<arch>' infix is what makes
+  // update.electronjs.org resolve the architecture. Its legacy '.exe' fallback
+  // only covers x64 and explicitly rejects names containing 'arm', so an
+  // arm64 installer without the infix is ignored by the feed entirely.
+  return `${productName}Setup-win32-${getDistArchitecture()}.exe`
 }
 
 export function getWindowsStandalonePath() {
@@ -95,7 +107,11 @@ export function getWindowsDeltaNugetPackagePath() {
 }
 
 export function getWindowsIdentifierName() {
-  return 'GitHubDesktop'
+  // Fork identity. This is the Squirrel package name and therefore also the
+  // install directory (%LOCALAPPDATA%\<name>) and the executable name. It MUST
+  // differ from upstream's 'GitHubDesktop' or installing this fork will fight
+  // with an installed GitHub Desktop over the same directory.
+  return 'GitDesktop'
 }
 
 export function getBundleSizes() {
@@ -107,9 +123,14 @@ export function getBundleSizes() {
     mainBundleSize: Fs.statSync(Path.join(outPath, 'main.js')).size,
   }
 }
-export const isPublishable = () =>
-  ['production', 'beta', 'test'].includes(getChannel())
+export const isPublishable = () => getChannel() === 'production'
 
+/**
+ * This fork ships a single release channel. Upstream has production/beta/test;
+ * update.electronjs.org skips draft and prerelease GitHub Releases outright, so
+ * there is nothing for a second channel to point at. Pre-release testing is
+ * done from CI build artifacts instead of over the update feed.
+ */
 export const getChannel = () =>
   process.env.RELEASE_CHANNEL ?? process.env.NODE_ENV ?? 'development'
 
@@ -136,18 +157,27 @@ export function getDistArchitecture(): 'arm64' | 'x64' {
 }
 
 export function getUpdatesURL() {
-  // It is also possible to use a `x64/` path, but for now we'll leave the
-  // original URL without architecture in it (which will still work for
-  // compatibility reasons) in case anything goes wrong until we have everything
-  // sorted out.
-  const architecturePath = getDistArchitecture() === 'arm64' ? 'arm64/' : ''
-  return `https://central.github.com/api/deployments/desktop/desktop/${architecturePath}latest?version=${version}&env=${getChannel()}`
+  // update.electronjs.org is Electron's free hosted update feed. It reads the
+  // GitHub Releases of a *public* repository and serves a Squirrel-compatible
+  // response, which is exactly what Electron's built-in autoUpdater expects
+  // (see AppWindow.checkForUpdates).
+  //
+  // Route shape: /:owner/:repo/:platform-:arch/:currentVersion
+  //
+  // Caveats worth remembering:
+  //  - Releases marked draft or prerelease are skipped by the service, and the
+  //    tag must be valid semver ('3.6.4' or 'v3.6.4', NOT 'release-3.6.4').
+  //    This is why we have a single release channel.
+  //  - Asset filenames must match the service's platform matcher. See the
+  //    comments on getOSXZipName / getWindowsStandaloneName.
+  const platform = process.platform === 'darwin' ? 'darwin' : 'win32'
+  return `https://update.electronjs.org/${getRepositorySlug()}/${platform}-${getDistArchitecture()}/${version}`
 }
 
 export function shouldMakeDelta() {
-  // Only production and beta channels include deltas. Test releases aren't
-  // necessarily sequential so deltas wouldn't make sense.
-  return ['production', 'beta'].includes(getChannel())
+  // Deltas require a sequential release history to diff against, which only
+  // the published channel has.
+  return getChannel() === 'production'
 }
 
 /**
@@ -161,17 +191,7 @@ export function getIconDirectory() {
 export function getChannelFromReleaseBranch(): string {
   const branchName = process.env.GITHUB_HEAD_REF ?? ''
 
-  if (!branchName.includes('releases/')) {
-    return 'development'
-  }
-
-  if (getVersion().includes('test')) {
-    return 'test'
-  }
-
-  if (getVersion().includes('beta')) {
-    return 'beta'
-  }
-
-  return 'production'
+  // Single channel: a release branch builds the published app, everything else
+  // is a development build. See the comment on getChannel.
+  return branchName.includes('releases/') ? 'production' : 'development'
 }
