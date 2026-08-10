@@ -62,6 +62,15 @@ export type MenuLabelsEvent = {
   readonly askForConfirmationWhenStashingAllChanges?: boolean
 
   /**
+   * Label for the "view this repository on its forge's website" item.
+   *
+   * Fork addition. Upstream hardcodes "View on GitHub", which is wrong for a
+   * Gitea repository -- it names a service that does not host it. Computed
+   * per selected repository; see lib/fork/host-labels.ts.
+   */
+  readonly viewOnHostLabel?: string
+
+  /**
    * Whether or not the changes filter is visible in the current view.
    * This is used to determine whether the toggle changes filter menu item
    * says "Show changes filter" or "Hide changes filter".

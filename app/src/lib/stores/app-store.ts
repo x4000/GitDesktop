@@ -308,6 +308,7 @@ import {
   enableWorktreeSupport,
 } from '../feature-flag'
 import { isGHES, isGitea } from '../endpoint-capabilities'
+import { getViewOnHostMenuLabel } from '../fork/host-labels'
 import { Banner, BannerType } from '../../models/banner'
 import { ComputedAction } from '../../models/computed-action'
 import {
@@ -2890,6 +2891,11 @@ export class AppStore extends TypedBaseStore<IAppState> {
       selectedExternalEditor: useCustomEditor ? null : selectedExternalEditor,
       askForConfirmationOnRepositoryRemoval,
       askForConfirmationOnForcePush,
+      viewOnHostLabel: getViewOnHostMenuLabel(
+        selectedRepository instanceof Repository
+          ? selectedRepository.gitHubRepository?.endpoint ?? null
+          : null
+      ),
     }
 
     if (state === null) {

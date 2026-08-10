@@ -32,6 +32,7 @@ import {
 } from '../../models/pull-request'
 import { KeyboardShortcut } from '../keyboard-shortcut/keyboard-shortcut'
 import { formatNumber } from '../../lib/format-number'
+import { getHostDisplayName } from '../../lib/fork/host-labels'
 
 function formatMenuItemLabel(text: string) {
   if (__WIN32__ || __LINUX__) {
@@ -278,15 +279,17 @@ export class NoChanges extends React.Component<
     this.props.dispatcher.incrementMetric('suggestedStepOpenWorkingDirectory')
 
   private renderViewOnGitHub() {
-    const isGitHub = this.props.repository.gitHubRepository !== null
+    const gitHubRepository = this.props.repository.gitHubRepository
 
-    if (!isGitHub) {
+    if (gitHubRepository === null) {
       return null
     }
 
     return this.renderMenuBackedAction(
       'view-repository-on-github',
-      `Open the repository page on GitHub in your browser`,
+      `Open the repository page on ${getHostDisplayName(
+        gitHubRepository.endpoint
+      )} in your browser`,
       undefined,
       this.onViewOnGitHubClicked
     )
