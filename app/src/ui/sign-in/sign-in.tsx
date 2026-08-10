@@ -16,7 +16,7 @@ import { OkCancelButtonGroup } from '../dialog/ok-cancel-button-group'
 import { Ref } from '../lib/ref'
 import { getHTMLURL } from '../../lib/api'
 import { LinkButton } from '../lib/link-button'
-import { isGitea, getKnownGiteaInstance } from '../../lib/fork/gitea'
+import { isGitea } from '../../lib/fork/gitea'
 
 interface ISignInProps {
   readonly dispatcher: Dispatcher
@@ -44,13 +44,17 @@ const DefaultTitle = 'Sign in'
  * Whether this endpoint signs in with a personal access token rather than a
  * browser OAuth flow.
  *
- * True for Gitea instances we have not registered an OAuth application on --
- * OAuth there requires per-instance registration, whereas a token works
- * anywhere. Registered instances (`KnownGiteaInstances`) will use PKCE once
- * that lands. See docs/fork/OAUTH.md.
+ * True for every Gitea endpoint at present. The browser flow is GitHub's: it
+ * sends GitHub's client ID and GitHub's scopes to whatever host it is pointed
+ * at, so aiming it at Gitea produces "Client ID not registered".
+ *
+ * Registered instances (`KnownGiteaInstances`) will move to PKCE once that is
+ * implemented -- at which point this becomes
+ * `isGitea(ep) && getKnownGiteaInstance(ep) === undefined`. Do not make that
+ * change before the PKCE path exists, or known instances fall back into the
+ * GitHub flow and fail. See docs/fork/OAUTH.md.
  */
-const usesTokenAuthentication = (endpoint: string) =>
-  isGitea(endpoint) && getKnownGiteaInstance(endpoint) === undefined
+const usesTokenAuthentication = (endpoint: string) => isGitea(endpoint)
 
 const browserSignInInfoContent = (
   <p>

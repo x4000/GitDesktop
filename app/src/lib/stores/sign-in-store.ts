@@ -282,6 +282,22 @@ export class SignInStore extends TypedBaseStore<SignInState | null> {
       }
     }
 
+    // This flow sends GitHub's client ID and GitHub's scopes to whatever host
+    // it is aimed at. Pointed at Gitea it produces a browser page reading
+    // "Client ID not registered", which gives no hint that the app sent the
+    // wrong credentials entirely. Fail here instead, where the message can say
+    // what actually happened.
+    if (isGitea(currentState.endpoint)) {
+      this.setState({
+        ...currentState,
+        loading: false,
+        error: new Error(
+          `Browser sign in is not available for Gitea instances yet. Sign in with a personal access token instead.`
+        ),
+      })
+      return
+    }
+
     const csrfToken = crypto.randomUUID()
 
     new Promise<Account>((resolve, reject) => {
