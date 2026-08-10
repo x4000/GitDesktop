@@ -17,12 +17,14 @@ plus the shared `win32-installer-splash.gif`.
 The dev variant is the same artwork hue-rotated to teal, so a development build
 is obvious next to a production one in the taskbar.
 
-## Replace the master with a 1024px original
+## Master resolution
 
-The current master is 256px, so macOS icons are upscaled and look soft at large
-sizes. Windows is unaffected — its largest icon is 256px, which the master
-covers exactly. Drop a 1024px PNG in as `app-icon.png` and re-run the script to
-fix macOS.
+The master is 512px. Windows is pixel-exact — its largest icon is 256px. macOS
+is upscaled 2x to fill the 1024px slot in the ICNS ladder, which is fine at
+normal sizes; only Finder's largest preview shows any softness. A 1024px master
+would remove that last bit, but it is not worth chasing.
+
+The generator warns if the master drops below 512px.
 
 ## What we deliberately do not ship
 

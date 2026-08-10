@@ -7,13 +7,13 @@
   "main": "./main.js",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Arcen/GitDesktop.git"
+    "url": "https://github.com/x4000/GitDesktop.git"
   },
   "description": "Simple collaboration from your desktop",
   "author": {
     "name": "Arcen Games, LLC",
     "email": "chrispark7@gmail.com",
-    "url": "https://github.com/Arcen/GitDesktop"
+    "url": "https://github.com/x4000/GitDesktop"
   },
   "license": "MIT",
   "dependencies": {
