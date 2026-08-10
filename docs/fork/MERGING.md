@@ -63,6 +63,43 @@ times a year; resolve those with `git rm` and move on.
 above conflicts, that is the signal our diff has grown beyond its intended
 shape.
 
+## What a merge actually costs
+
+Measured, not guessed. Our diff was replayed onto an upstream base from 30 days
+earlier — 90 upstream commits of drift, touching 10 of the 51 files we modify —
+to see what collides:
+
+| File | Conflict |
+| --- | --- |
+| `app/package.json` | Our identity block against their version bump |
+| `script/build.ts` | Their icon-resolution rewrite against our `extraResource` |
+| `app/src/ui/preferences/copilot.tsx` | Both sides added an import |
+| `.gitattributes` | Both sides appended a line |
+
+**Four conflicts, all trivial** — none needed more than picking both sides or
+keeping ours. A month of upstream drift is minutes of work, not hours.
+
+Two things to expect on a real merge:
+
+- `app/package.json` conflicts **every time** upstream bumps the version,
+  because our identity block sits in the same hunk. Resolve by keeping our
+  identity and taking their version number. `rerere` learns this one after the
+  first time.
+- Upstream is actively changing icon handling in `script/build.ts`. Our
+  `Assets.car` change (see [ICONS.md](ICONS.md)) sits right where they are
+  working, so re-read that hunk rather than resolving it mechanically.
+
+To repeat this measurement before a big merge:
+
+```bash
+git diff --binary upstream/development..main -- . ':(exclude)app/static/logos' > /tmp/fork.patch
+git checkout -b merge-sim $(git rev-list -1 --before="30 days ago" upstream/development)
+git apply -3 /tmp/fork.patch    # conflicts here are what a month of drift costs
+```
+
+Exclude `app/static/logos` — those are generated binaries, and rewinding past
+their introduction fails for reasons a forward merge never hits.
+
 ## The rule that keeps this cheap
 
 New files never conflict. Edited files do.
