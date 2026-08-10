@@ -25,7 +25,31 @@ How it behaves: the app requests a user code, shows it to the user, and the user
 enters it at <https://github.com/login/device>. Meanwhile the app polls for the
 token. No redirect, no callback, no custom protocol handler, no secret.
 
-## Gitea — decide later, start with tokens
+## Gitea — OAuth for Arcen's instance, PAT for everyone else
+
+**Arcen instance client ID: `6ae0a048-e223-4fd1-b924-8d9848b63c2c`**
+
+Like the GitHub one, this is not a secret and is committed deliberately.
+
+**No client secret is used, even though Gitea issued one.** Registering as a
+public client with PKCE is what makes the secret unnecessary — see below. If the
+app was registered with "Confidential Client" ticked, Gitea will *demand* the
+secret at token exchange and PKCE alone will not authenticate; untick it.
+
+Because a Gitea client ID is per-instance, it cannot be a single build-time
+constant the way GitHub's is. Known instances are listed in fork configuration,
+keyed by instance URL; anything not in that list falls back to a personal access
+token, which needs no registration.
+
+### Why not just embed the secret
+
+Even a low-sensitivity secret is the wrong shape here. It ships to every user's
+disk in a public app, so it cannot be treated as proof of anything, and rotating
+it would break every installed client at once. PKCE gives the same result with
+nothing to leak or rotate. The one real cost — per-instance registration — is
+why other instances get the token path instead.
+
+## Gitea elsewhere — start with tokens
 
 Gitea supports OAuth2 with **PKCE public clients**, which is the equivalent
 secretless flow. But an OAuth app has to be registered **on every Gitea instance
@@ -36,13 +60,14 @@ there before anyone can sign in.
 A personal access token has no such requirement — it works against any instance
 immediately, with nothing to register.
 
-**Recommendation: ship PAT support first.** Add OAuth later if the extra
-sign-in step proves annoying in daily use. The two are not exclusive; upstream
-already models multiple sign-in paths.
+**Recommendation: PAT is the default path for any instance we have not
+registered an app on.** The two are not exclusive; upstream already models
+multiple sign-in paths.
 
-### If/when you do want OAuth
+### Registering an app on another instance
 
-Register the application on the Gitea instance. Two places, depending on scope:
+If a second instance is used often enough to justify it, register there and add
+it to the known-instances list. Two places, depending on scope:
 
 - **Instance-wide** (all users): Site Administration → Applications, at
   `/admin/applications`. Requires admin.
@@ -66,14 +91,26 @@ port** on a loopback redirect URI, which is what lets the app spin up a
 throwaway local listener on whatever port is free. Gitea's own docs specifically
 warn against `localhost` here, per RFC 8252.
 
-Gitea then issues a Client ID. Record it the same way as the GitHub one — it is
-equally not a secret. Because it differs per instance, it cannot be baked into
-the build; it belongs in per-instance configuration entered at sign-in time.
+Gitea then issues a Client ID. Add it to the known-instances list keyed by the
+instance URL. Ignore the client secret it issues alongside — with the client
+marked public, PKCE replaces it.
 
 Relevant scopes are `repository` and `user` (each has read/write variants).
 
 ## Status
 
-Not yet implemented. The build still carries upstream's secret-based web flow,
-so sign-in does not currently work correctly in this fork. Implementing the
-device flow is the next piece of work.
+**Not yet implemented.** The build still carries upstream's secret-based web
+flow, so sign-in does not currently work correctly in this fork.
+
+The work, in order:
+
+1. GitHub device flow, replacing the authorization-code exchange in
+   `app/src/lib/api.ts` and dropping `__OAUTH_SECRET__` from the build.
+2. Gitea PKCE against the known-instances list.
+3. Gitea PAT entry as the fallback for unregistered instances. Note that
+   upstream deleted its token/password form — `authentication-form.tsx` is now a
+   single "Sign in using your browser" button — so this means restoring UI. That
+   file has had zero commits upstream in twelve months, so it is cheap surface
+   to own.
+
+Outstanding before step 2: the Arcen instance URL, which keys the client ID.
