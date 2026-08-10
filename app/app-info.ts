@@ -2,8 +2,28 @@ import { getSHA } from './git-info'
 import { getUpdatesURL, getChannel } from '../script/dist-info'
 import { version, productName, companyName } from './package.json'
 
-const devClientId = '3a723b10ac5575cc5bb9'
-const devClientSecret = '22c34d87789a365981ed921352a7b9a8c3f69d54'
+/**
+ * Our GitHub OAuth application.
+ *
+ * Not a secret: OAuth client IDs are public by design, the device flow
+ * transmits this in plaintext, and it is readable from the binary regardless.
+ * Committed so development builds work without any environment setup.
+ *
+ * Upstream's default here was *their* development application
+ * ('3a723b10ac5575cc5bb9'), which has neither device flow enabled nor our
+ * callback registered -- so a build falling back to it cannot sign in at all.
+ *
+ * This application must have "Enable Device Flow" ticked. See
+ * docs/fork/OAUTH.md.
+ */
+const forkClientId = 'Ov23liLgD0Eau7Pm4Sag'
+
+/**
+ * Retained only for `requestOAuthToken`, which serves the protocol-callback
+ * path that the device flow never initiates. There is no client secret for our
+ * application, and a public repository could not hold one anyway.
+ */
+const devClientSecret = ''
 
 const channel = getChannel()
 
@@ -16,7 +36,7 @@ export function getReplacements() {
   const isDevBuild = channel === 'development'
 
   return {
-    __OAUTH_CLIENT_ID__: s(process.env.DESKTOP_OAUTH_CLIENT_ID || devClientId),
+    __OAUTH_CLIENT_ID__: s(process.env.DESKTOP_OAUTH_CLIENT_ID || forkClientId),
     __OAUTH_SECRET__: s(
       process.env.DESKTOP_OAUTH_CLIENT_SECRET || devClientSecret
     ),

@@ -73,8 +73,19 @@ export async function requestDeviceCode(
   )
 
   if (!response.ok) {
+    // GitHub puts the actual reason in the body -- `device_flow_disabled` when
+    // the application has not enabled it, `incorrect_client_credentials` for a
+    // bad client id. Reporting only the status code turns a one-line fix into
+    // a guessing game.
+    const detail = await response
+      .text()
+      .then(t => t.slice(0, 300))
+      .catch(() => '')
+
     throw new Error(
-      `Could not start sign in (HTTP ${response.status}). If this persists, the OAuth application may not have device flow enabled.`
+      `Could not start sign in (HTTP ${response.status}).${
+        detail ? ` ${detail}` : ''
+      } If the application has not enabled device flow, tick "Enable Device Flow" on the OAuth app.`
     )
   }
 
