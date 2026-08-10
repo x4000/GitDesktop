@@ -7,6 +7,7 @@ import { TooltipDirection } from './tooltip'
 import {
   isGHE,
   isGHES,
+  isGitea,
   supportsAvatarsAPI,
 } from '../../lib/endpoint-capabilities'
 import { Account } from '../../models/account'
@@ -188,7 +189,16 @@ const DefaultAvatarSymbol: OcticonSymbolVariant = {
   ],
 }
 
-function getEmailAvatarUrl(ep: string) {
+function getEmailAvatarUrl(ep: string): URL | undefined {
+  if (isGitea(ep)) {
+    // Gitea has no email-keyed avatar endpoint. Falling through to the
+    // github.com default below would send our users' email addresses to
+    // GitHub's avatar CDN -- a privacy leak, not merely a broken image. Gitea
+    // serves avatars via the `avatar_url` on its API responses, which is
+    // already handled above, and failing that we render the placeholder.
+    return undefined
+  }
+
   if (isGHES(ep)) {
     // GHES Endpoint urls look something like https://github.example.com/api/v3
     // (note the lack of a trailing slash). We really should change our endpoint
@@ -261,6 +271,10 @@ function getAvatarUrlCandidates(
   }
 
   const emailAvatarUrl = getEmailAvatarUrl(ep)
+
+  if (emailAvatarUrl === undefined) {
+    return candidates
+  }
 
   emailAvatarUrl.searchParams.set('email', email)
   emailAvatarUrl.searchParams.set('s', `${size}`)
