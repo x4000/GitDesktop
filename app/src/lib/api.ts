@@ -2172,8 +2172,9 @@ export class API {
    * @returns Copilot license and API endpoint.
    */
   public async fetchUserCopilotInfo(): Promise<UserCopilotInfo | undefined> {
-    // Copilot is not available on GHES
-    if (isGHES(this.endpoint)) {
+    // Copilot is not available on GHES, and Gitea has neither Copilot nor a
+    // GraphQL API for the query below to reach.
+    if (isGHES(this.endpoint) || isGitea(this.endpoint)) {
       return undefined
     }
 

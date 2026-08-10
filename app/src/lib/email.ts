@@ -1,6 +1,6 @@
 import { IAPIEmail } from './api'
 import { Account } from '../models/account'
-import { isGHES } from './endpoint-capabilities'
+import { isGHES, isGitea } from './endpoint-capabilities'
 
 /**
  * Lookup a suitable email address to display in the application, based on the
@@ -51,11 +51,25 @@ function isEmailPublic(email: IAPIEmail): boolean {
  * Returns the stealth email host name for a given endpoint. The stealth
  * email host is hardcoded to the subdomain users.noreply under the
  * endpoint host.
+ *
+ * Gitea uses `noreply.<domain>` rather than GitHub's `users.noreply.<domain>`
+ * (its NO_REPLY_ADDRESS setting, which defaults to `noreply.%(DOMAIN)s`). The
+ * distinction matters because these addresses are written into commits as
+ * Co-authored-by trailers: falling through to the github.com default would
+ * attribute a Gitea colleague to an address at a host they have no account on.
+ *
+ * The setting is configurable per instance and we have no API to read it, so
+ * this is the documented default rather than a guarantee.
  */
-const getStealthEmailHostForEndpoint = (endpoint: string) =>
-  isGHES(endpoint)
+const getStealthEmailHostForEndpoint = (endpoint: string) => {
+  if (isGitea(endpoint)) {
+    return `noreply.${new URL(endpoint).hostname}`
+  }
+
+  return isGHES(endpoint)
     ? `users.noreply.${new URL(endpoint).hostname}`
     : 'users.noreply.github.com'
+}
 
 /**
  * Generate a legacy stealth email address for the user
@@ -103,6 +117,14 @@ export function getStealthEmailForUser(
   endpoint: string
 ) {
   const stealthEmailHost = getStealthEmailHostForEndpoint(endpoint)
+
+  // The `id+login` form is GitHub's. Gitea's noreply addresses are just
+  // `login@noreply.<domain>`, so including the id would produce an address
+  // that never resolves to the user it is meant to credit.
+  if (isGitea(endpoint)) {
+    return `${login}@${stealthEmailHost}`
+  }
+
   return `${id}+${login}@${stealthEmailHost}`
 }
 

@@ -27,7 +27,7 @@ import {
 import { urlWithoutCredentials } from './url-without-credentials'
 import { trampolineUIHelper as ui } from './trampoline-ui-helper'
 import { getAPIEndpoint, isGitHubHost } from '../api'
-import { isDotCom, isGHE, isGist } from '../endpoint-capabilities'
+import { isDotCom, isGHE, isGist, isGitea } from '../endpoint-capabilities'
 
 type Credential = Map<string, string>
 type Store = AccountsStore
@@ -148,6 +148,19 @@ const getEndpointKind = async (cred: Credential, store: Store) => {
 
   if (isGHE(endpoint)) {
     return 'ghe.com'
+  }
+
+  // Upstream classifies Gitea as 'generic' via the realm check below, which is
+  // right for them -- they have no Gitea accounts, so git has to fall back to
+  // the generic credential store. We do have Gitea accounts, and their tokens
+  // work as git passwords, so an instance we recognise is account-backed like
+  // any enterprise host.
+  //
+  // Note this only fires for instances we know: a Gitea host the user has
+  // never signed in to is not `isGitea`, so it still falls through to the
+  // realm check and the generic path, which is what we want for it.
+  if (isGitea(endpoint)) {
+    return 'enterprise'
   }
 
   // When Git attempts to authenticate with a host it captures any

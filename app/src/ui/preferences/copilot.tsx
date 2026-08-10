@@ -1,6 +1,6 @@
 import * as React from 'react'
 import type { IBYOKProvider } from '../../lib/copilot/byok'
-import { isGHES } from '../../lib/endpoint-capabilities'
+import { isGHES, isGitea } from '../../lib/endpoint-capabilities'
 import { enableCopilotSdkCommitMessageGeneration } from '../../lib/feature-flag'
 import {
   type CopilotFeature,
@@ -153,7 +153,11 @@ export class CopilotPreferences extends React.Component<ICopilotPreferencesProps
   }
 
   private getCopilotAccounts(): ReadonlyArray<Account> {
-    return this.props.accounts.filter(account => !isGHES(account.endpoint))
+    // Gitea has no Copilot; excluded explicitly because it is not GHES and
+    // would otherwise be offered Copilot settings.
+    return this.props.accounts.filter(
+      account => !isGHES(account.endpoint) && !isGitea(account.endpoint)
+    )
   }
 
   private getCopilotSettingsAccounts(): ReadonlyArray<Account> {

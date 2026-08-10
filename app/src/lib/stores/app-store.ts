@@ -307,7 +307,7 @@ import {
   enableCustomIntegration,
   enableWorktreeSupport,
 } from '../feature-flag'
-import { isGHES } from '../endpoint-capabilities'
+import { isGHES, isGitea } from '../endpoint-capabilities'
 import { Banner, BannerType } from '../../models/banner'
 import { ComputedAction } from '../../models/computed-action'
 import {
@@ -1085,6 +1085,10 @@ export class AppStore extends TypedBaseStore<IAppState> {
     return this.accounts.filter(
       account =>
         !isGHES(account.endpoint) &&
+        // Gitea has no Copilot. Without this it passes the !isGHES test and
+        // reaches getCopilotGHHost, which would point the Copilot CLI at the
+        // Gitea host.
+        !isGitea(account.endpoint) &&
         enableCopilotSdkCommitMessageGeneration(account) &&
         account.isCopilotDesktopEnabled === true &&
         account.copilotLicenseType !== undefined &&
