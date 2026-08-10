@@ -1,19 +1,19 @@
 {
   "name": "gitdesktop",
   "productName": "GitDesktop",
-  "bundleID": "com.example.GitDesktop",
-  "companyName": "Example, Inc.",
+  "bundleID": "com.arcengames.GitDesktop",
+  "companyName": "Arcen Games, LLC",
   "version": "3.6.4",
   "main": "./main.js",
   "repository": {
     "type": "git",
-    "url": "https://github.com/YOUR-ORG/gitdesktop.git"
+    "url": "https://github.com/Arcen/GitDesktop.git"
   },
   "description": "Simple collaboration from your desktop",
   "author": {
-    "name": "GitHub, Inc.",
-    "email": "opensource+desktop@github.com",
-    "url": "https://desktop.github.com/"
+    "name": "Arcen Games, LLC",
+    "email": "chrispark7@gmail.com",
+    "url": "https://github.com/Arcen/GitDesktop"
   },
   "license": "MIT",
   "dependencies": {

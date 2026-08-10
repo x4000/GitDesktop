@@ -10,6 +10,17 @@ name: Release
 #
 # The published GitHub Release must not be a draft or a prerelease, for the
 # same reason.
+#
+# macOS: we do not sign or notarize. Squirrel.Mac refuses to apply an update to
+# an unsigned app, so publishing a macOS zip to the release would put Mac
+# clients in a loop -- the feed offers an update, the app downloads it, and the
+# install silently fails on restart. Instead macOS is built (to catch build
+# breakage, and to produce a downloadable artifact for manual installs) but its
+# zip is NOT attached to the release, so the feed has nothing to offer and Mac
+# clients cleanly see "no update available".
+#
+# To enable macOS updates later: add the APPLE_* secrets, restore them to the
+# build step below, and set PUBLISH_MACOS to 'true'.
 
 on:
   push:
@@ -23,6 +34,8 @@ on:
 
 env:
   NODE_VERSION: 24.15.0
+  # Flip to 'true' once macOS builds are signed and notarized.
+  PUBLISH_MACOS: 'false'
 
 jobs:
   build:
@@ -74,17 +87,11 @@ jobs:
         run: yarn build:prod
         env:
           # Device flow only needs the client id -- there is deliberately no
-          # DESKTOP_OAUTH_CLIENT_SECRET here. See docs/fork/OAUTH.md.
+          # DESKTOP_OAUTH_CLIENT_SECRET here.
           DESKTOP_OAUTH_CLIENT_ID: ${{ secrets.DESKTOP_OAUTH_CLIENT_ID }}
-          # macOS signing/notarization. update.electronjs.org REQUIRES signed
-          # macOS builds; Squirrel.Mac will refuse to apply an update to an
-          # unsigned app. If these secrets are absent the build still succeeds,
-          # but macOS auto-update will not work.
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          APPLE_APPLICATION_CERT: ${{ secrets.APPLE_APPLICATION_CERT }}
-          KEY_PASSWORD: ${{ secrets.APPLE_APPLICATION_CERT_PASSWORD }}
+          # No APPLE_* secrets: macOS builds are unsigned and unnotarized. See
+          # the header comment. getNotarizationOptions() in script/build.ts
+          # returns undefined when they are absent, so the build still succeeds.
           npm_config_arch: ${{ matrix.arch }}
           TARGET_ARCH: ${{ matrix.arch }}
 
@@ -151,6 +158,20 @@ jobs:
           echo "Merged RELEASES:"
           cat RELEASES
 
+      # Unsigned macOS builds cannot be updated by Squirrel.Mac. Withholding
+      # the zip from the release means the feed reports "no update" to Mac
+      # clients instead of handing them one that fails to install. The build
+      # artifact is still downloadable from the workflow run for manual
+      # installs. See the header comment.
+      - name: Withhold unsigned macOS assets
+        if: env.PUBLISH_MACOS != 'true'
+        shell: bash
+        working-directory: artifacts
+        run: |
+          set -euo pipefail
+          rm -fv GitDesktop-darwin-*.zip
+          echo "macOS assets withheld (PUBLISH_MACOS=${PUBLISH_MACOS})."
+
       - name: Verify asset names match the update feed matcher
         shell: bash
         working-directory: artifacts
@@ -163,15 +184,17 @@ jobs:
               fail=1
             fi
           }
-          # darwin: /.*-(mac|darwin|osx).*\.zip$/, arm64 keyed on '-arm64'
-          check 'GitDesktop-darwin-x64.zip'
-          check 'GitDesktop-darwin-arm64.zip'
           # win32: /.*-win32-(ia32|x64|arm64).*/
           check 'GitDesktopSetup-win32-x64.exe'
           check 'GitDesktopSetup-win32-arm64.exe'
           check '*-win32-x64-full.nupkg'
           check '*-win32-arm64-full.nupkg'
           check 'RELEASES'
+          if [ "${PUBLISH_MACOS}" = "true" ]; then
+            # darwin: /.*-(mac|darwin|osx).*\.zip$/, arm64 keyed on '-arm64'
+            check 'GitDesktop-darwin-x64.zip'
+            check 'GitDesktop-darwin-arm64.zip'
+          fi
           exit $fail
 
       # Uses the built-in gh CLI rather than a third-party release action --
