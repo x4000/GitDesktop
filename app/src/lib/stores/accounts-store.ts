@@ -231,6 +231,23 @@ export class AccountsStore extends TypedBaseStore<ReadonlyArray<Account>> {
       const key = getKeyForAccount(accountWithoutToken)
       try {
         const token = await this.secureStore.getItem(key, account.login)
+
+        if (!token) {
+          // An empty token is not an error here, so the account stays loaded
+          // and every subsequent request goes out unauthenticated. The API
+          // then answers as it would for an anonymous caller -- an empty
+          // repository list, or a 403 that says nothing about credentials --
+          // which is a confusing way to discover you are signed out.
+          //
+          // This is what happens to accounts stored before a change to the key
+          // returned by getKeyForEndpoint: the credential is still in the
+          // store, just under the previous name. Signing out and back in
+          // rewrites it under the current one.
+          log.warn(
+            `No token found for '${key}' (${account.login}). Requests for this account will be unauthenticated; sign out and back in to restore it.`
+          )
+        }
+
         accountsWithTokens.push(accountWithoutToken.withToken(token || ''))
       } catch (e) {
         log.error(`Error getting token for '${key}'. Skipping.`, e)
