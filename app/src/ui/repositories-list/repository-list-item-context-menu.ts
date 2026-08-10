@@ -7,6 +7,11 @@ import {
   DefaultEditorLabel,
   DefaultShellLabel,
 } from '../lib/context-menu'
+import {
+  isRepositoryPinned,
+  setRepositoryPinned,
+} from '../../lib/fork/pinned-repositories'
+import { getViewOnHostLabel } from '../../lib/fork/host-labels'
 
 interface IRepositoryListItemContextMenuConfig {
   repository: Repositoryish
@@ -38,7 +43,20 @@ export const generateRepositoryListContextMenu = (
     ? `Open in ${config.shellLabel}`
     : DefaultShellLabel
 
+  const pinned = isRepositoryPinned(repository.id)
+
   const items: ReadonlyArray<IMenuItem> = [
+    {
+      label: pinned
+        ? __DARWIN__
+          ? 'Unpin Repository'
+          : 'Unpin repository'
+        : __DARWIN__
+        ? 'Pin Repository'
+        : 'Pin repository',
+      action: () => setRepositoryPinned(repository.id, !pinned),
+    },
+    { type: 'separator' },
     ...buildAliasMenuItems(config),
     ...buildWorktreeMenuItems(config),
     {
@@ -51,7 +69,13 @@ export const generateRepositoryListContextMenu = (
     },
     { type: 'separator' },
     {
-      label: 'View on GitHub',
+      // Named after the actual forge rather than always saying GitHub; see
+      // lib/fork/host-labels.ts.
+      label: getViewOnHostLabel(
+        repository instanceof Repository
+          ? repository.gitHubRepository?.endpoint ?? null
+          : null
+      ),
       action: () => config.onViewOnGitHub(repository),
       enabled: github,
     },

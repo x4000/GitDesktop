@@ -23,6 +23,11 @@ import { TooltippedContent } from '../lib/tooltipped-content'
 import memoizeOne from 'memoize-one'
 import { KeyboardShortcut } from '../keyboard-shortcut/keyboard-shortcut'
 import { generateRepositoryListContextMenu } from '../repositories-list/repository-list-item-context-menu'
+import { Disposable } from 'event-kit'
+import {
+  getPinnedRepositoryIds,
+  onPinnedRepositoriesChanged,
+} from '../../lib/fork/pinned-repositories'
 import { enableWorktreeSupport } from '../../lib/feature-flag'
 import { SectionFilterList } from '../lib/section-filter-list'
 import { assertNever } from '../../lib/fatal-error'
@@ -122,7 +127,12 @@ export class RepositoriesList extends React.Component<
     (
       repositories: ReadonlyArray<Repositoryish> | null,
       localRepositoryStateLookup: ReadonlyMap<number, ILocalRepositoryState>,
-      recentRepositories: ReadonlyArray<number>
+      recentRepositories: ReadonlyArray<number>,
+      // Not used in the body: groupRepositories reads the pinned set itself.
+      // It is an argument purely so that memoizeOne invalidates when pins
+      // change -- none of the other inputs do, so without this the list would
+      // keep rendering the previous grouping.
+      _pinnedRepositories: ReadonlySet<number>
     ) =>
       repositories === null
         ? []
@@ -132,6 +142,8 @@ export class RepositoriesList extends React.Component<
             recentRepositories
           )
   )
+
+  private pinSubscription: Disposable | null = null
 
   /**
    * A memoized function for finding the selected list item based
@@ -151,6 +163,17 @@ export class RepositoriesList extends React.Component<
       newRepositoryMenuExpanded: false,
       selectedItem: null,
     }
+  }
+
+  public componentDidMount() {
+    // AppStore owns the props this list renders from and knows nothing about
+    // pins, so nothing re-renders on its own when one changes.
+    this.pinSubscription = onPinnedRepositoriesChanged(() => this.forceUpdate())
+  }
+
+  public componentWillUnmount() {
+    this.pinSubscription?.dispose()
+    this.pinSubscription = null
   }
 
   private renderItem = (item: IRepositoryListItem, matches: IMatches) => {
@@ -242,16 +265,12 @@ export class RepositoriesList extends React.Component<
 
   private getGroupLabel(group: RepositoryListGroup) {
     const { kind } = group
-    if (kind === 'enterprise') {
-      return group.host
-    } else if (kind === 'other') {
-      return 'Other'
-    } else if (kind === 'dotcom') {
-      return group.owner.login
-    } else if (kind === 'recent') {
-      return 'Recent'
+    if (kind === 'pinned') {
+      return 'Pinned'
+    } else if (kind === 'all') {
+      return 'Repositories'
     } else {
-      assertNever(kind, `Unknown repository group kind ${kind}`)
+      return assertNever(kind, `Unknown repository group kind ${kind}`)
     }
   }
 
@@ -325,7 +344,8 @@ export class RepositoriesList extends React.Component<
     const groups = this.getRepositoryGroups(
       this.props.repositories,
       this.props.localRepositoryStateLookup,
-      this.props.recentRepositories
+      this.props.recentRepositories,
+      getPinnedRepositoryIds()
     )
 
     // So there's two types of selection at play here. There's the repository
