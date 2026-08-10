@@ -20,6 +20,7 @@ import { IOAuthAction } from '../parse-app-url'
 import { shell } from '../app-shell'
 import noop from 'lodash/noop'
 import { AccountsStore } from './accounts-store'
+import { isGitea, probeIsGitea, setEndpointKind } from '../fork/gitea'
 
 /**
  * An enumeration of the possible steps that the sign in
@@ -329,6 +330,61 @@ export class SignInStore extends TypedBaseStore<SignInState | null> {
       })
   }
 
+  /**
+   * Complete the Authentication step using a personal access token rather than
+   * a browser OAuth flow.
+   *
+   * This exists for Gitea, where OAuth requires an application to have been
+   * registered on that specific instance. A token needs no registration and
+   * works against any instance, so it is the path for anything not in
+   * `KnownGiteaInstances`. See docs/fork/OAUTH.md.
+   *
+   * The token is validated by using it: `fetchUser` both proves the token works
+   * and gives us the account it belongs to.
+   */
+  public async signInWithToken(token: string): Promise<void> {
+    const currentState = this.state
+
+    if (currentState?.kind !== SignInStep.Authentication) {
+      const stepText = currentState ? currentState.kind : 'null'
+      return fatalError(
+        `Sign in step '${stepText}' not compatible with token authentication`
+      )
+    }
+
+    const { endpoint, resultCallback } = currentState
+    this.setState({ ...currentState, loading: true, error: null })
+
+    let account: Account
+
+    try {
+      account = await fetchUser(endpoint, token)
+    } catch (e) {
+      log.warn(`[SignInStore] token sign in failed for ${endpoint}`, e)
+
+      // Only surface the error if this sign-in session is still the live one.
+      if (this.state?.kind === SignInStep.Authentication) {
+        this.setState({
+          ...this.state,
+          loading: false,
+          error: new Error(
+            `Could not sign in with that token. Check that it is correct and that it grants the 'repository' and 'user' scopes.`
+          ),
+        })
+      }
+
+      return
+    }
+
+    if (this.state?.kind !== SignInStep.Authentication) {
+      log.warn('[SignInStore] token accepted but session has changed')
+      return
+    }
+
+    this.emitAuthenticate(account)
+    this.setState({ kind: SignInStep.Success, resultCallback })
+  }
+
   public async resolveOAuthRequest(action: IOAuthAction) {
     if (!this.state || this.state.kind !== SignInStep.Authentication) {
       return
@@ -432,6 +488,23 @@ export class SignInStore extends TypedBaseStore<SignInState | null> {
 
       this.setState({ ...currentState, loading: false, error })
       return
+    }
+
+    // getEnterpriseAPIURL has to know whether this host serves /api/v1 (Gitea)
+    // or /api/v3 (GitHub Enterprise Server), and for a host we have never seen
+    // there is nothing to answer from -- Gitea advertises no version header the
+    // way GHES does. So probe once, here, while there is already a loading
+    // state on screen, and remember the answer.
+    //
+    // A probe that cannot reach the host returns undefined rather than false;
+    // we deliberately do not record a negative we are unsure of, and fall
+    // through to the GHES default as upstream would.
+    if (!isGitea(validUrl)) {
+      const gitea = await probeIsGitea(validUrl)
+
+      if (gitea !== undefined) {
+        setEndpointKind(validUrl, gitea ? 'gitea' : 'github')
+      }
     }
 
     const endpoint = getEnterpriseAPIURL(validUrl)

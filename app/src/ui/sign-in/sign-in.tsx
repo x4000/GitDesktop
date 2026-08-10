@@ -15,6 +15,8 @@ import { Dialog, DialogError, DialogContent, DialogFooter } from '../dialog'
 import { OkCancelButtonGroup } from '../dialog/ok-cancel-button-group'
 import { Ref } from '../lib/ref'
 import { getHTMLURL } from '../../lib/api'
+import { LinkButton } from '../lib/link-button'
+import { isGitea, getKnownGiteaInstance } from '../../lib/fork/gitea'
 
 interface ISignInProps {
   readonly dispatcher: Dispatcher
@@ -26,6 +28,10 @@ interface ISignInProps {
 
 interface ISignInState {
   readonly endpoint: string
+
+  /** Personal access token, for endpoints authenticated by token rather than
+   * a browser OAuth flow. See `usesTokenAuthentication`. */
+  readonly token: string
 }
 
 const SignInWithBrowserTitle = __DARWIN__
@@ -33,6 +39,18 @@ const SignInWithBrowserTitle = __DARWIN__
   : 'Sign in using your browser'
 
 const DefaultTitle = 'Sign in'
+
+/**
+ * Whether this endpoint signs in with a personal access token rather than a
+ * browser OAuth flow.
+ *
+ * True for Gitea instances we have not registered an OAuth application on --
+ * OAuth there requires per-instance registration, whereas a token works
+ * anywhere. Registered instances (`KnownGiteaInstances`) will use PKCE once
+ * that lands. See docs/fork/OAUTH.md.
+ */
+const usesTokenAuthentication = (endpoint: string) =>
+  isGitea(endpoint) && getKnownGiteaInstance(endpoint) === undefined
 
 const browserSignInInfoContent = (
   <p>
@@ -50,6 +68,7 @@ export class SignIn extends React.Component<ISignInProps, ISignInState> {
 
     this.state = {
       endpoint: '',
+      token: '',
     }
   }
 
@@ -95,7 +114,11 @@ export class SignIn extends React.Component<ISignInProps, ISignInState> {
           .then(() => this.props.dispatcher.setSignInEndpoint(state.endpoint))
         break
       case SignInStep.Authentication:
-        this.props.dispatcher.requestBrowserAuthentication()
+        if (usesTokenAuthentication(state.endpoint)) {
+          this.props.dispatcher.signInWithToken(this.state.token)
+        } else {
+          this.props.dispatcher.requestBrowserAuthentication()
+        }
         break
       case SignInStep.Success:
         this.onDismissed()
@@ -133,7 +156,12 @@ export class SignIn extends React.Component<ISignInProps, ISignInState> {
         primaryButtonText = continueWithBrowserLabel
         break
       case SignInStep.Authentication:
-        primaryButtonText = continueWithBrowserLabel
+        if (usesTokenAuthentication(state.endpoint)) {
+          primaryButtonText = 'Sign in'
+          disableSubmit = this.state.token.length === 0
+        } else {
+          primaryButtonText = continueWithBrowserLabel
+        }
         break
       default:
         return assertNever(state, `Unknown sign in step ${stepKind}`)
@@ -192,9 +220,49 @@ export class SignIn extends React.Component<ISignInProps, ISignInState> {
     return (
       <DialogContent>
         {credentialHelperInfo}
-        {browserSignInInfoContent}
+        {usesTokenAuthentication(state.endpoint)
+          ? this.renderTokenSignIn(state)
+          : browserSignInInfoContent}
       </DialogContent>
     )
+  }
+
+  /**
+   * Token entry, used for Gitea instances we have no OAuth application
+   * registered on. Browser sign in is not offered here because it would send
+   * the user to an authorize page that rejects an unregistered client.
+   */
+  private renderTokenSignIn(state: IAuthenticationState) {
+    const tokenURL = new URL(
+      '/user/settings/applications',
+      getHTMLURL(state.endpoint)
+    ).toString()
+
+    return (
+      <>
+        <p>
+          Sign in to <Ref>{getHTMLURL(state.endpoint)}</Ref> with a personal
+          access token. Generate one under Settings → Applications, granting it
+          the <Ref>repository</Ref> and <Ref>user</Ref> scopes.
+        </p>
+        <Row>
+          <TextBox
+            label="Personal access token"
+            value={this.state.token}
+            onValueChanged={this.onTokenChanged}
+            type="password"
+            autoFocus={true}
+          />
+        </Row>
+        <p className="secondary-text">
+          <LinkButton uri={tokenURL}>Create a token</LinkButton>
+        </p>
+      </>
+    )
+  }
+
+  private onTokenChanged = (token: string) => {
+    this.setState({ token })
   }
 
   private renderStep(): JSX.Element | null {

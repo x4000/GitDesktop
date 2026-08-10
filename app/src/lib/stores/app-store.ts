@@ -7966,6 +7966,10 @@ export class AppStore extends TypedBaseStore<IAppState> {
     this.signInStore.authenticateWithBrowser()
   }
 
+  public _signInWithToken(token: string): Promise<void> {
+    return this.signInStore.signInWithToken(token)
+  }
+
   public async _setAppFocusState(isFocused: boolean): Promise<void> {
     if (this.appIsFocused !== isFocused) {
       this.appIsFocused = isFocused

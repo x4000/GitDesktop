@@ -1711,6 +1711,15 @@ export class Dispatcher {
     return this.appStore._setSignInEndpoint(url)
   }
 
+  /**
+   * Complete the current sign in using a personal access token instead of a
+   * browser OAuth flow. Used for Gitea instances we have no OAuth application
+   * registered on.
+   */
+  public signInWithToken(token: string): Promise<void> {
+    return this.appStore._signInWithToken(token)
+  }
+
   public beginDotComSignIn(resultCallback: (result: SignInResult) => void) {
     this.appStore._beginDotComSignIn(resultCallback)
   }
