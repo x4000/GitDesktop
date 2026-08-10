@@ -52,6 +52,16 @@ ICNS_MASTER = 1024
 
 SPLASH_SIZE = (400, 400)
 
+# The About dialog's logo. Upstream ships separate macOS and Windows variants
+# (rounded-rect vs square GitHub marks); our artwork is the same on both, so
+# both files get identical content rather than being collapsed into one -- the
+# two paths are referenced from upstream code we would otherwise have to edit.
+ABOUT_LOGO_SIZE = (128, 128)
+ABOUT_LOGO_PATHS = (
+    "common/logo-64x64@2x.png",
+    "common/windows-logo-64x64@2x.png",
+)
+
 # Degrees of hue rotation applied to the dev variant. 230 turns the purple
 # artwork teal -- unmistakably different from production at 16px, and it stays
 # clean at small sizes where the intermediate hues go muddy olive.
@@ -132,6 +142,12 @@ def main() -> None:
 
     print("shared:")
     write_splash(src, LOGOS / "win32-installer-splash.gif")
+
+    about = src.resize(ABOUT_LOGO_SIZE, Image.LANCZOS)
+    for relative in ABOUT_LOGO_PATHS:
+        dest = LOGOS.parent / relative
+        about.save(dest, format="PNG")
+        print(f"  {dest.relative_to(ROOT)}  {ABOUT_LOGO_SIZE[0]}x{ABOUT_LOGO_SIZE[1]}")
 
 
 if __name__ == "__main__":

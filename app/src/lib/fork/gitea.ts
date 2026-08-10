@@ -125,6 +125,22 @@ export function isGitea(endpoint: string): boolean {
 }
 
 /**
+ * Whether this endpoint signs in with a personal access token rather than a
+ * browser OAuth flow.
+ *
+ * True for every Gitea endpoint at present. The browser flow is GitHub's: it
+ * sends GitHub's client ID and GitHub's scopes to whatever host it is aimed
+ * at, so pointing it at Gitea yields "Client ID not registered".
+ *
+ * Registered instances (`KnownGiteaInstances`) will move to PKCE once that is
+ * implemented -- at which point this becomes
+ * `isGitea(ep) && getKnownGiteaInstance(ep) === undefined`. Do not make that
+ * change before the PKCE path exists, or known instances fall back into the
+ * GitHub flow and fail. See docs/fork/OAUTH.md.
+ */
+export const usesTokenAuthentication = (endpoint: string) => isGitea(endpoint)
+
+/**
  * Probe an unknown host to see whether it is running Gitea.
  *
  * `/api/v1/version` is unauthenticated and Gitea-specific; GitHub Enterprise

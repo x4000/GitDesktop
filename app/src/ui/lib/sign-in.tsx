@@ -12,6 +12,8 @@ import {
 } from '../../lib/stores'
 import { Ref } from './ref'
 import { getHTMLURL } from '../../lib/api'
+import { usesTokenAuthentication } from '../../lib/fork/gitea'
+import { GiteaTokenForm } from '../fork/gitea-token-form'
 
 interface ISignInProps {
   readonly signInState: SignInState
@@ -60,10 +62,25 @@ export class SignIn extends React.Component<ISignInProps, {}> {
     )
   }
 
+  private onTokenSignIn = (token: string) => {
+    this.props.dispatcher.signInWithToken(token)
+  }
+
   private renderAuthenticationStep(
     state: IAuthenticationState | IExistingAccountWarning
   ) {
     const children = this.props.children as ReadonlyArray<JSX.Element>
+
+    if (usesTokenAuthentication(state.endpoint)) {
+      return (
+        <GiteaTokenForm
+          endpoint={state.endpoint}
+          loading={state.loading}
+          onSubmit={this.onTokenSignIn}
+          additionalButtons={children}
+        />
+      )
+    }
 
     return (
       <AuthenticationForm

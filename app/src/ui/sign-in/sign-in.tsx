@@ -15,8 +15,8 @@ import { Dialog, DialogError, DialogContent, DialogFooter } from '../dialog'
 import { OkCancelButtonGroup } from '../dialog/ok-cancel-button-group'
 import { Ref } from '../lib/ref'
 import { getHTMLURL } from '../../lib/api'
-import { LinkButton } from '../lib/link-button'
-import { isGitea } from '../../lib/fork/gitea'
+import { usesTokenAuthentication } from '../../lib/fork/gitea'
+import { GiteaTokenFields } from '../fork/gitea-token-form'
 
 interface ISignInProps {
   readonly dispatcher: Dispatcher
@@ -39,22 +39,6 @@ const SignInWithBrowserTitle = __DARWIN__
   : 'Sign in using your browser'
 
 const DefaultTitle = 'Sign in'
-
-/**
- * Whether this endpoint signs in with a personal access token rather than a
- * browser OAuth flow.
- *
- * True for every Gitea endpoint at present. The browser flow is GitHub's: it
- * sends GitHub's client ID and GitHub's scopes to whatever host it is pointed
- * at, so aiming it at Gitea produces "Client ID not registered".
- *
- * Registered instances (`KnownGiteaInstances`) will move to PKCE once that is
- * implemented -- at which point this becomes
- * `isGitea(ep) && getKnownGiteaInstance(ep) === undefined`. Do not make that
- * change before the PKCE path exists, or known instances fall back into the
- * GitHub flow and fail. See docs/fork/OAUTH.md.
- */
-const usesTokenAuthentication = (endpoint: string) => isGitea(endpoint)
 
 const browserSignInInfoContent = (
   <p>
@@ -232,36 +216,16 @@ export class SignIn extends React.Component<ISignInProps, ISignInState> {
   }
 
   /**
-   * Token entry, used for Gitea instances we have no OAuth application
-   * registered on. Browser sign in is not offered here because it would send
-   * the user to an authorize page that rejects an unregistered client.
+   * Token entry for Gitea. The submit affordance lives in the dialog footer,
+   * so this embeds the shared fields rather than the full form.
    */
   private renderTokenSignIn(state: IAuthenticationState) {
-    const tokenURL = new URL(
-      '/user/settings/applications',
-      getHTMLURL(state.endpoint)
-    ).toString()
-
     return (
-      <>
-        <p>
-          Sign in to <Ref>{getHTMLURL(state.endpoint)}</Ref> with a personal
-          access token. Generate one under Settings → Applications, granting it
-          the <Ref>repository</Ref> and <Ref>user</Ref> scopes.
-        </p>
-        <Row>
-          <TextBox
-            label="Personal access token"
-            value={this.state.token}
-            onValueChanged={this.onTokenChanged}
-            type="password"
-            autoFocus={true}
-          />
-        </Row>
-        <p className="secondary-text">
-          <LinkButton uri={tokenURL}>Create a token</LinkButton>
-        </p>
-      </>
+      <GiteaTokenFields
+        endpoint={state.endpoint}
+        value={this.state.token}
+        onValueChanged={this.onTokenChanged}
+      />
     )
   }
 
