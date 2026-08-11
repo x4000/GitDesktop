@@ -11,11 +11,11 @@ Everything else tracks upstream and is merged in periodically. This is not a
 general-purpose replacement for GitHub Desktop — if you are not on our team,
 you almost certainly want [the original](https://desktop.github.com/).
 
-> **Status: working, not yet released.** Sign-in, cloning, committing and
-> pushing are verified against both github.com and a real Gitea instance, and
-> the repository list is a permanent left-hand pane. The release, update and
-> branding pipeline is in place but has never cut a release; macOS builds are
-> unsigned and therefore manual-install only.
+> **Status: released.** 3.6.4 is published and installable. Sign-in, cloning,
+> committing and pushing are verified against both github.com and a real Gitea
+> instance, and the update feed serves the release correctly. Windows x64 only,
+> unsigned. The one part still unproven is a client actually applying an
+> update, which needs a second release to test against.
 
 ## Installing
 
