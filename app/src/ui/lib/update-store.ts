@@ -19,7 +19,6 @@ import { parseError } from '../../lib/squirrel-error-parser'
 import { ReleaseSummary } from '../../models/release-notes'
 import { generateReleaseSummary } from '../../lib/release-notes'
 import { setNumber, getNumber } from '../../lib/local-storage'
-import { enableUpdateFromEmulatedX64ToARM64 } from '../../lib/feature-flag'
 import { offsetFromNow } from '../../lib/offset-from'
 import { gte, SemVer } from 'semver'
 import { getVersion } from './app-proxy'
@@ -223,42 +222,22 @@ class UpdateStore {
     }
   }
 
+  /**
+   * The feed URL must stay free of query parameters.
+   *
+   * Squirrel.Windows builds the RELEASES address by appending "/RELEASES" to
+   * this string. With a query string present that lands *inside* the query --
+   * ".../3.6.4?guid=abc/RELEASES" -- so update.electronjs.org sees an ordinary
+   * update check and answers with JSON, which Squirrel cannot parse. Windows
+   * updates then fail with no useful error.
+   *
+   * Everything upstream added here was for central.github.com: `skipGuidCheck`
+   * and `guid` drive their staggered release system, and the x64-to-arm64
+   * rewrite targets a `/desktop/desktop/...` path shape our feed does not use.
+   * None of it applies, and all of it breaks the URL.
+   */
   private async getUpdatesUrl(skipGuidCheck: boolean) {
-    let url = null
-
-    try {
-      url = new URL(__UPDATES_URL__)
-    } catch (e) {
-      log.error('Error parsing updates url', e)
-      return __UPDATES_URL__
-    }
-
-    if (skipGuidCheck) {
-      // This will effectively disable the staggered releases system and attempt
-      // to retrieve the latest available deployment.
-      url.searchParams.set('skipGuidCheck', '1')
-    }
-
-    // If the app is running under arm64 to x64 translation, we need to tweak the
-    // update URL here to point at the arm64 binary.
-    if (
-      enableUpdateFromEmulatedX64ToARM64() &&
-      (await isRunningUnderARM64Translation()) === true
-    ) {
-      url.pathname = url.pathname.replace(
-        /\/desktop\/desktop\/(x64\/)?latest/,
-        '/desktop/desktop/arm64/latest'
-      )
-
-      // If we want the app to force an auto-update from x64 to arm64 right
-      // after being installed, we need to spoof a really old version to trick
-      // both Central and Squirrel into thinking we need the update.
-      if (this.supportsImmediateUpdateFromEmulatedX64ToARM64()) {
-        url.searchParams.set('version', '0.0.64')
-      }
-    }
-
-    return url.toString()
+    return __UPDATES_URL__
   }
 
   /** Quit and install the update. */
