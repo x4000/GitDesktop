@@ -1,5 +1,9 @@
 {
   "releases": {
+    "2026.8.3": [
+      "[Fixed] The update check no longer sits on 'Checking for updates...' indefinitely when no update is available",
+      "[Fixed] Release notes are read from this repository's changelog format rather than the shape upstream's changelog service returned"
+    ],
     "2026.8.2": [
       "[Fixed] Update checks no longer hang. Package filenames carried an architecture suffix that Squirrel read as a prerelease tag, so it judged every published version older than the installed one and finished without reporting anything",
       "[Fixed] Package URLs in the update manifest are absolute, so downloads no longer depend on the update service rewriting them"

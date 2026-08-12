@@ -118,15 +118,35 @@ class UpdateStore {
   }
 
   private onUpdateNotAvailable = async () => {
-    // This is so we can check for pretext changelog for showcasing a recent update
-    this.newReleases = await generateReleaseSummary()
+    // Status first, then the changelog. Upstream awaits the summary before
+    // recording the result, so anything that throws in there -- an
+    // unreachable changelog, an unexpected shape -- leaves the store in
+    // CheckingForUpdates and the About dialog spinning forever, with no error
+    // shown. The check itself has already succeeded by this point; release
+    // notes are decoration on top of that.
     this.touchLastChecked()
     this.status = UpdateStatus.UpdateNotAvailable
     this.emitDidChange()
+
+    try {
+      this.newReleases = await generateReleaseSummary()
+      this.emitDidChange()
+    } catch (e) {
+      log.warn('Could not generate release summary', e)
+    }
   }
 
   private onUpdateDownloaded = async () => {
-    this.newReleases = await generateReleaseSummary()
+    // Same reasoning as onUpdateNotAvailable: record that the update is ready
+    // before anything that can throw. An update the user cannot install
+    // because the changelog failed to load would be a poor trade.
+    this.status = UpdateStatus.UpdateReady
+    this.emitDidChange()
+
+    this.newReleases = await generateReleaseSummary().catch(e => {
+      log.warn('Could not generate release summary', e)
+      return null
+    })
     // We know it's an "immediate" auto-update from x64 to arm64 if the app is
     // running on arm64 under x64 emulation and there is only one new release
     // and it's the same version we have right now (which means we spoofed

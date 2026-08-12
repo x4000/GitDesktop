@@ -106,12 +106,41 @@ export async function getChangeLog(
   const response = await fetch(changelogURL.toString(), {
     headers: { 'user-agent': getUserAgent() },
   })
-  if (response.ok) {
-    const releases: ReadonlyArray<ReleaseMetadata> = await response.json()
-    return releases
-  } else {
+
+  if (!response.ok) {
     return []
   }
+
+  // Upstream fetched this from a service that returned ReleaseMetadata[]
+  // already. We serve the repository's own changelog.json, which is the
+  // *source* format the release tooling edits:
+  //
+  //   { "releases": { "2026.8.2": ["[Fixed] ...", ...], ... } }
+  //
+  // Handing that straight back as an array meant callers did `.filter` on an
+  // object and threw. The rejection surfaced as the About dialog sitting on
+  // "Checking for updates..." forever, because the handler that consumes this
+  // sets its status after awaiting it.
+  const body = await response.json()
+  const releases: Record<string, ReadonlyArray<string>> = body?.releases ?? {}
+
+  const entries = Object.entries(releases)
+    // A key that is not valid semver would throw in the comparisons callers
+    // do with it. None exist today; this is so adding one cannot break the
+    // update flow.
+    .filter(([version]) => semver.valid(version) !== null)
+    .sort(([a], [b]) => semver.rcompare(a, b))
+    .map(([version, notes]) => ({
+      name: version,
+      version,
+      notes,
+      // The source format carries no dates. Callers filter on recency and
+      // fall back to the newest release when nothing qualifies, which is the
+      // behaviour we want anyway.
+      pub_date: '',
+    }))
+
+  return limit === undefined ? entries : entries.slice(0, limit)
 }
 
 export async function generateReleaseSummary(
@@ -128,9 +157,16 @@ export async function generateReleaseSummary(
   // We should only be pulling release notes when a release just happened, so
   // there should be one within the past 90 days. Thus, this is just precaution
   // to ensure we always show at least the last set of release notes.
-  return recentReleases.length > 0
-    ? recentReleases.map(getReleaseSummary)
-    : [getReleaseSummary(lastTenReleases[0])]
+  if (recentReleases.length > 0) {
+    return recentReleases.map(getReleaseSummary)
+  }
+
+  // Upstream indexes [0] unconditionally here, which throws when the changelog
+  // could not be fetched at all. Callers await this before updating their own
+  // state, so a throw leaves the UI wedged.
+  return lastTenReleases.length > 0
+    ? [getReleaseSummary(lastTenReleases[0])]
+    : []
 }
 
 /**
