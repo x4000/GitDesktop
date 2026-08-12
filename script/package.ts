@@ -187,6 +187,7 @@ async function packageWindows() {
       }
 
       if (releases !== undefined) {
+        releases = absolutizeReleaseUrls(releases)
         console.log(`Rewriting ${releasesPath} to match renamed packages`)
         writeFileSync(releasesPath, releases, 'utf8')
       }
@@ -233,4 +234,43 @@ async function hasPublishedRelease(): Promise<boolean> {
     console.warn(`Could not reach ${url}; skipping deltas.`, e)
     return false
   }
+}
+
+/**
+ * Rewrite every package reference in a RELEASES file to an absolute URL.
+ *
+ * Squirrel writes bare filenames, which it resolves against the feed URL when
+ * downloading. That works against a plain file server; update.electronjs.org
+ * is not one. It rewrites a package name to an absolute GitHub URL itself --
+ * but only *one* per response. A RELEASES file with deltas has three entries
+ * (previous full, new delta, new full), so the two the client actually needs
+ * stay relative, and requesting them from the service returns its JSON update
+ * object rather than a package. Squirrel then downloads a couple of hundred
+ * bytes of JSON and the update fails.
+ *
+ * Doing the rewrite ourselves makes every entry absolute, so nothing depends
+ * on the service's substitution. Its own rewrite then finds nothing to replace
+ * and passes the body through untouched.
+ *
+ * Every package named here is present in `dist` at upload time -- Squirrel
+ * copies the previous release's package in when building a delta -- so all of
+ * them are assets of *this* release, and one tag resolves them all.
+ */
+function absolutizeReleaseUrls(releases: string): string {
+  const base = `https://github.com/${getRepositorySlug()}/releases/download/${getVersion()}`
+
+  return releases
+    .split('\n')
+    .map(line => {
+      // "<SHA1> <package> <size>", where <package> may already be a URL.
+      const parts = line.trim().split(/\s+/)
+
+      if (parts.length < 3 || parts[1].includes('://')) {
+        return line
+      }
+
+      parts[1] = `${base}/${parts[1]}`
+      return parts.join(' ')
+    })
+    .join('\n')
 }
