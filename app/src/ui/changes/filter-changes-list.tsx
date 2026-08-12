@@ -75,6 +75,7 @@ import {
 import { ChangesListFilterOptions } from './changes-list-filter-options'
 import { HookProgress } from '../../lib/git'
 import { formatNumber } from '../../lib/format-number'
+import { getFilesForIncludeToggle } from '../../lib/fork/include-selection'
 
 export interface IChangesListItem extends IFilterListItem {
   readonly id: string
@@ -415,12 +416,7 @@ export class FilterChangesList extends React.Component<
     changeListItem: IChangesListItem,
     matches: IMatches
   ): JSX.Element | null => {
-    const {
-      rebaseConflictState,
-      isCommitting,
-      onIncludeChanged,
-      availableWidth,
-    } = this.props
+    const { rebaseConflictState, isCommitting, availableWidth } = this.props
 
     const file = changeListItem.change
     const selection = file.selection.getSelectionType()
@@ -464,7 +460,7 @@ export class FilterChangesList extends React.Component<
         file={file}
         include={isPartiallyCommittableSubmodule && include ? null : include}
         key={file.id}
-        onIncludeChanged={onIncludeChanged}
+        onIncludeChanged={this.onRowIncludeChanged}
         availableWidth={availableWidth}
         disableSelection={disableSelection}
         checkboxTooltip={checkboxTooltip}
@@ -764,7 +760,7 @@ export class FilterChangesList extends React.Component<
             ? 'Include Selected Files'
             : 'Include selected files',
           action: () => {
-            selectedFiles.map(file => this.props.onIncludeChanged(file, true))
+            this.props.onIncludeChanged(selectedFiles, true)
           },
         },
         {
@@ -772,7 +768,7 @@ export class FilterChangesList extends React.Component<
             ? 'Exclude Selected Files'
             : 'Exclude selected files',
           action: () => {
-            selectedFiles.map(file => this.props.onIncludeChanged(file, false))
+            this.props.onIncludeChanged(selectedFiles, false)
           },
         },
         { type: 'separator' },
@@ -1183,6 +1179,33 @@ export class FilterChangesList extends React.Component<
     const filteredSet = new Map<string, IChangesListItem>()
     filteredItems.forEach(f => filteredSet.set(f.id, f))
     this.setState({ filteredItems: filteredSet })
+  }
+
+  /**
+   * Toggling a checkbox inside a multi-selection applies to the whole
+   * selection, rather than only the row that was clicked.
+   *
+   * The new value is the one the user just chose, not a per-file toggle: with
+   * eight of ten selected files unchecked, ticking one of the unchecked ones
+   * checks all ten rather than inverting each. Inverting would leave the
+   * selection in the same mixed state it started in, which is never what the
+   * click was asking for.
+   *
+   * Same rule the context menu already uses -- act on the selection when the
+   * clicked row is part of it, on the single row when it is not.
+   */
+  private onRowIncludeChanged = (
+    file: WorkingDirectoryFileChange,
+    include: boolean
+  ) => {
+    const { workingDirectory, selectedFileIDs, onIncludeChanged } = this.props
+
+    // One call with the whole set rather than one per file: the prop accepts
+    // an array, and the dispatcher applies it as a single state change.
+    onIncludeChanged(
+      getFilesForIncludeToggle(file, selectedFileIDs, workingDirectory),
+      include
+    )
   }
 
   private onFileSelectionChanged = (items: ReadonlyArray<IChangesListItem>) => {
