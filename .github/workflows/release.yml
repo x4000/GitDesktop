@@ -127,7 +127,12 @@ jobs:
           name: ${{ matrix.friendlyName }}-${{ matrix.arch }}
           path: |
             dist/GitDesktop-darwin-${{ matrix.arch }}.zip
-            dist/GitDesktop-*-win32-${{ matrix.arch }}-*.nupkg
+            # This version's packages only. Squirrel copies the previous
+            # release's package into dist to build a delta from, but its
+            # RELEASES entry keeps the absolute URL pointing at the release it
+            # already lives in, so re-uploading it would add ~300MB of
+            # duplicate to every release for nothing.
+            dist/GitDesktop-${{ github.ref_name }}-*.nupkg
             dist/GitDesktopSetup-win32-${{ matrix.arch }}.exe
             dist/RELEASES-${{ matrix.arch }}
           if-no-files-found: error
@@ -151,11 +156,15 @@ jobs:
         run: |
           set -euo pipefail
           # Squirrel's RELEASES format is one entry per line:
-          #   <SHA1> <nupkg filename> <size>
-          # Because script/package.ts rewrote each entry to use the
-          # arch-qualified .nupkg name, the two files can simply be
-          # concatenated. update.electronjs.org reads this single file and
-          # substitutes the .nupkg matching the requested architecture.
+          #   <SHA1> <package URL> <size>
+          # script/package.ts rewrites each entry to an absolute GitHub URL,
+          # so concatenating the per-arch files is safe: every line already
+          # says exactly which package it refers to.
+          #
+          # Note the packages are NOT arch-qualified. Squirrel parses the
+          # version out of the filename, and a suffix after the version reads
+          # as a prerelease tag, which makes it sort below the release it
+          # qualifies. See the comment in script/package.ts.
           : > RELEASES
           for f in RELEASES-x64 RELEASES-arm64; do
             if [ -f "$f" ]; then
@@ -198,7 +207,7 @@ jobs:
           }
           # win32: /.*-win32-(ia32|x64|arm64).*/
           check 'GitDesktopSetup-win32-x64.exe'
-          check '*-win32-x64-full.nupkg'
+          check '*-full.nupkg'
           check 'RELEASES'
           if [ "${PUBLISH_MACOS}" = "true" ]; then
             # darwin: /.*-(mac|darwin|osx).*\.zip$/, arm64 keyed on '-arm64'

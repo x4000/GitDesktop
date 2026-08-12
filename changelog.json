@@ -1,5 +1,9 @@
 {
   "releases": {
+    "2026.8.2": [
+      "[Fixed] Update checks no longer hang. Package filenames carried an architecture suffix that Squirrel read as a prerelease tag, so it judged every published version older than the installed one and finished without reporting anything",
+      "[Fixed] Package URLs in the update manifest are absolute, so downloads no longer depend on the update service rewriting them"
+    ],
     "2026.8.1": [
       "[Added] Pin repositories to the top of the repository list; everything else is one alphabetical list",
       "[Added] Toggling a checkbox in the changes list applies to every selected file, not just the clicked row",

@@ -17,13 +17,11 @@ import {
   shouldMakeDelta,
   getBundleSizes,
   getDistRoot,
-  getDistArchitecture,
   getIconDirectory,
 } from './dist-info'
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { getVersion } from '../app/package-info'
 import { computeBundleHashSync } from '../app/src/lib/compute-bundle-hash'
-import { rename } from 'fs/promises'
 import { join } from 'path'
 
 const distPath = getDistPath()
@@ -104,11 +102,6 @@ async function packageWindows() {
     setupMsi: getWindowsInstallerName(),
   }
 
-  // Whether deltas are actually being produced, as opposed to merely wanted.
-  // The rename step below depends on this too: it looked for a delta package
-  // unconditionally and died with ENOENT when one was not built.
-  let makingDeltas = false
-
   if (shouldMakeDelta()) {
     // Squirrel needs a *previous* release to diff a delta package against.
     //
@@ -130,7 +123,6 @@ async function packageWindows() {
 
     if (await hasPublishedRelease()) {
       options.remoteReleases = repositoryURL
-      makingDeltas = true
     } else {
       console.log(
         'No published release found; building a full package with no deltas.'
@@ -153,42 +145,38 @@ async function packageWindows() {
     .createWindowsInstaller(options)
     .then(() => console.log(`Installers created in ${outputDir}`))
     .then(async () => {
-      // electron-winstaller (more specifically Squirrel.Windows) doesn't let
-      // us control the name of the nuget packages but we want them to include
-      // the architecture similar to how the setup exe does so we'll just have
-      // to rename them here after the fact.
+      // Upstream renames the nuget packages to carry the architecture, and an
+      // earlier version of this fork went further and used '-win32-<arch>-' so
+      // update.electronjs.org's asset matcher would recognise them.
       //
-      // The '-win32-<arch>-' infix (rather than upstream's '-<arch>-') is
-      // required by update.electronjs.org's asset matcher. Because a single
-      // GitHub Release serves every architecture, and the service always
-      // fetches an asset literally named 'RELEASES', both architectures'
-      // entries end up in one RELEASES file -- the service then picks the
-      // right .nupkg out of it per architecture. That only works if the
-      // filenames in RELEASES are arch-qualified, so we rewrite the file to
-      // match the names we just renamed to.
-      const arch = getDistArchitecture()
-      const prefix = `${getWindowsIdentifierName()}-${getVersion()}`
+      // Both are wrong for a client. Squirrel parses the version out of the
+      // package filename by NuGet convention, '{id}-{version}.nupkg', so
+      // anything after the version is absorbed into it:
+      //
+      //   GitDesktop-2026.8.1-win32-x64-full.nupkg
+      //     -> version "2026.8.1-win32-x64"
+      //
+      // A hyphen introduces a prerelease tag, and a prerelease sorts *below*
+      // the release it qualifies. Squirrel compared 2026.8.1-win32-x64 against
+      // the installed 2026.8.1, concluded the server was behind, and exited
+      // without raising an event at all -- the app sat on "Checking for
+      // updates..." forever. The log said:
+      //
+      //   warn: CheckForUpdateImpl: hwhat, local version is greater than
+      //   remote version
+      //
+      // So the packages keep the names Squirrel gave them. Nothing needs the
+      // arch infix: the service identifies the platform from the setup .exe,
+      // which is still arch-tagged, and it no longer has to rewrite anything
+      // in RELEASES because absolutizeReleaseUrls does that for it.
       const releasesPath = join(outputDir, 'RELEASES')
 
-      let releases = existsSync(releasesPath)
-        ? readFileSync(releasesPath, 'utf8')
-        : undefined
+      if (existsSync(releasesPath)) {
+        const releases = absolutizeReleaseUrls(
+          readFileSync(releasesPath, 'utf8')
+        )
 
-      for (const kind of makingDeltas ? ['full', 'delta'] : ['full']) {
-        const fromName = `${prefix}-${kind}.nupkg`
-        const toName = `${prefix}-win32-${arch}-${kind}.nupkg`
-
-        console.log(`Renaming ${fromName} to ${toName}`)
-        await rename(join(outputDir, fromName), join(outputDir, toName))
-
-        // Squirrel generated RELEASES before we renamed anything, so its
-        // entries still reference the original filenames.
-        releases = releases?.split(fromName).join(toName)
-      }
-
-      if (releases !== undefined) {
-        releases = absolutizeReleaseUrls(releases)
-        console.log(`Rewriting ${releasesPath} to match renamed packages`)
+        console.log(`Rewriting ${releasesPath} with absolute package URLs`)
         writeFileSync(releasesPath, releases, 'utf8')
       }
     })
