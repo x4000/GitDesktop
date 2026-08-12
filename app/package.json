@@ -3,7 +3,7 @@
   "productName": "GitDesktop",
   "bundleID": "com.arcengames.GitDesktop",
   "companyName": "Arcen Games, LLC",
-  "version": "3.6.4",
+  "version": "2026.8.1",
   "main": "./main.js",
   "repository": {
     "type": "git",

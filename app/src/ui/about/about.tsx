@@ -221,8 +221,9 @@ export class About extends React.Component<IAboutProps> {
       return (
         <DialogError>
           Couldn't determine the last time an update check was performed. You
-          may be running an old version. Please try manually checking for
-          updates and contact GitHub Support if the problem persists
+          may be running an old version. Try checking for updates manually. If
+          you are running a development build, automatic updates are expected
+          not to work: they require an app installed by the Windows installer.
         </DialogError>
       )
     }
@@ -230,22 +231,14 @@ export class About extends React.Component<IAboutProps> {
     return null
   }
 
+  /**
+   * Upstream points here at their beta channel. This fork ships a single
+   * channel -- update.electronjs.org skips prerelease GitHub Releases, so
+   * there is nothing a second channel could point at -- and the link went to
+   * GitHub's own download page, which does not offer this app at all.
+   */
   private renderBetaLink() {
-    if (__RELEASE_CHANNEL__ === 'beta') {
-      return
-    }
-
-    return (
-      <div>
-        <p className="no-padding">Looking for the latest features?</p>
-        <p className="no-padding">
-          Check out the{' '}
-          <LinkButton uri="https://desktop.github.com/beta">
-            Beta Channel
-          </LinkButton>
-        </p>
-      </div>
-    )
+    return null
   }
 
   public render() {
@@ -294,11 +287,6 @@ export class About extends React.Component<IAboutProps> {
             <p className="no-padding terms-and-license">
               <LinkButton onClick={this.props.onShowAcknowledgements}>
                 License and Open Source Notices
-              </LinkButton>
-            </p>
-            <p className="terms-and-license">
-              <LinkButton uri="https://gh.io/copilot-for-desktop-transparency">
-                Responsible use of Copilot in GitHub Desktop
               </LinkButton>
             </p>
           </div>

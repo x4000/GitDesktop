@@ -2,6 +2,28 @@
 
 One channel, one workflow. Bump the version, tag it, push the tag.
 
+## Versioning
+
+**Date-based: `YYYY.M.N`** — `2026.8.1`, `2026.8.2`, `2026.9.1`.
+
+Deliberately decoupled from upstream's numbering. Tracking it (`3.6.4`, then
+`3.6.5`) would claim version numbers upstream has not released yet, so the same
+number would eventually mean two different builds.
+
+The tempting middle ground does not exist. A fourth component (`3.6.4.1`) is not
+valid semver, so `update.electronjs.org` skips the release entirely and the tag
+filter below never even matches. A prerelease suffix (`3.6.4-1`) sorts *below*
+`3.6.4` and is skipped as a prerelease besides. Build metadata (`3.6.4+1`)
+compares equal to `3.6.4`, so the updater sees nothing new.
+
+Whatever is chosen has to be valid semver, not a prerelease, and strictly
+greater than the last published version. Note this makes the scheme one-way:
+having shipped `2026.8.1`, going back to `3.x` would be a downgrade that no
+client would ever install.
+
+Record which upstream release a version is based on in the release notes, since
+the version number no longer says it.
+
 ```bash
 # 1. Bump "version" in app/package.json, commit it.
 # 2. Tag with PLAIN SEMVER and push:
