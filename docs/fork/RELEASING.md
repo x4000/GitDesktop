@@ -25,10 +25,10 @@ Record which upstream release a version is based on in the release notes, since
 the version number no longer says it.
 
 ```bash
-# 1. Bump "version" in app/package.json, commit it.
-# 2. Tag with PLAIN SEMVER and push:
-git tag 3.6.5
-git push origin 3.6.5
+# 1. Bump "version" in app/package.json and add a changelog.json entry, commit.
+# 2. Tag with the version, exactly, and push:
+git tag 2026.8.4
+git push origin 2026.8.4
 ```
 
 [`.github/workflows/release.yml`](../../.github/workflows/release.yml) does the
@@ -51,10 +51,22 @@ erroring. Hence:
 - **The tag must match `app/package.json`.** The workflow fails the build if it
   does not. A mismatch means clients either never see the update or download it
   forever.
-- **Asset filenames are load-bearing.** The service matches macOS on
-  `/.*-(mac|darwin|osx).*\.zip$/` and Windows on `/.*-win32-(ia32|x64|arm64).*/`.
-  `script/dist-info.ts` produces names that satisfy this and explains why in
-  comments. The release job verifies them before publishing.
+- **Asset filenames are load-bearing, in two opposite directions.** The service
+  identifies a platform by matching assets: macOS on
+  `/.*-(mac|darwin|osx).*\.zip$/`, Windows on `/.*-win32-(ia32|x64|arm64).*/`.
+  The **setup .exe** carries that arch tag and is what identifies the platform.
+
+  The **.nupkg packages must NOT be arch-tagged.** Squirrel parses the version
+  out of the package filename by NuGet convention, so anything after the
+  version is absorbed into it: `GitDesktop-2026.8.1-win32-x64-full.nupkg` reads
+  as version `2026.8.1-win32-x64`. A hyphen starts a prerelease tag, and a
+  prerelease sorts *below* the release it qualifies, so every published version
+  looks older than the installed one and the client silently never updates.
+  This cost three releases to find. Do not "fix" the package names to match the
+  installer.
+
+  `script/dist-info.ts` and `script/package.ts` explain both halves in
+  comments, and the release job verifies the names before publishing.
 
 ## macOS
 
@@ -62,8 +74,11 @@ erroring. Hence:
 
 Windows on arm64 runs x64 builds under emulation, so an arm64 build is an
 optimisation rather than a requirement; it is not worth the build minutes yet.
-The asset naming and the `RELEASES` merge already handle multiple
-architectures, so adding `arm64` back to the matrix is the only change needed.
+The `RELEASES` merge already handles multiple architectures, so adding `arm64`
+back to the matrix is the only change needed -- but note that both
+architectures then publish packages with identical filenames, since packages
+cannot be arch-tagged (see above). Separate releases per architecture, or an
+`id` that differs per arch, would be needed to tell them apart.
 
 macOS is not in the build matrix at all.
 
